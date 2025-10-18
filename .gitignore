@@ -1,0 +1,18 @@
+# 全部無視
+*
+
+# gitignore 自体は追跡
+!.gitignore
+
+# ディレクトリごと追跡
+!src/
+!out/
+
+# ディレクトリ内の特定のファイルだけ追跡
+!src/**/*.ts
+!out/**/*.js
+
+# ルート直下のファイル
+!tsconfig.json
+!package.json
+!*.vsix
