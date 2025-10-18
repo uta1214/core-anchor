@@ -1,0 +1,87 @@
+{
+  "name": "code-anchor",
+  "displayName": "code-anchor",
+  "description": "opne for favorite files and bookmarks",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "code-anchor.refresh",
+        "title": "Code Anchor: Refresh"
+      },
+      {
+        "command": "code-anchor.addBookmark",
+        "title": "Code Anchor: Add Bookmark",
+        "icon": "$(bookmark)"
+      },
+      {
+        "command": "code-anchor.addFavorite",
+        "title": "Code Anchor: Add to Favorites",
+        "icon": "$(star)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "code-anchor.addBookmark",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "code-anchor.addFavorite",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "code-anchor.addBookmark",
+          "group": "code-anchor@1",
+          "when": "editorTextFocus"
+        },
+        {
+          "command": "code-anchor.addFavorite",
+          "group": "code-anchor@2",
+          "when": "editorTextFocus"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "code-anchor",
+          "title": "Code Anchor",
+          "icon": "$(location)"
+        }
+      ]
+    },
+    "views": {
+      "code-anchor": [
+        {
+          "type": "webview",
+          "id": "code-anchor.mainView",
+          "name": "Code Anchor",
+          "retainContextWhenHidden": true
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^16.x",
+    "typescript": "^5.0.0"
+  }
+}
