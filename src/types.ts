@@ -17,10 +17,10 @@ export interface BookmarksData {
 
 // アイコンタイプの表示名
 export const ICON_TYPE_LABELS: Record<BookmarkIconType, string> = {
-  default: '📌 Default',
-  todo: '✅ TODO',
-  bug: '🐛 Bug',
-  note: '📝 Note',
-  important: '⚠️ Important',
-  question: '❓ Question'
+  default: 'Default',
+  todo: 'TODO',
+  bug: 'Bug',
+  note: 'Note',
+  important: 'Important',
+  question: 'Question'
 };

@@ -72,6 +72,41 @@
           "retainContextWhenHidden": true
         }
       ]
+    },
+    "configuration": {
+      "title": "Code Anchor",
+      "properties": {
+        "code-anchor.icons.default": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for Default bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.todo": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for TODO bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.bug": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for Bug bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.note": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for Note bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.important": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for Important bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.question": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for Question bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        }
+      }
     }
   },
   "scripts": {
