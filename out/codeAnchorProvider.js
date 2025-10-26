@@ -233,7 +233,6 @@ class CodeAnchorProvider {
         }
         const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
         const line = editor.selection.active.line;
-        // アイコン画像付きのQuickPickアイテムを作成
         const iconTypeItems = Object.entries(types_1.ICON_TYPE_LABELS).map(([value, label]) => {
             const iconPath = this.getIconPath(value);
             return {
@@ -262,6 +261,8 @@ class CodeAnchorProvider {
         if (!bookmarks[relativePath]) {
             bookmarks[relativePath] = [];
         }
+        // 同じ行に既存のブックマークがあれば削除（上書き）
+        bookmarks[relativePath] = bookmarks[relativePath].filter(b => b.line !== line);
         bookmarks[relativePath].push({
             line,
             label,
@@ -301,8 +302,8 @@ class CodeAnchorProvider {
         await this.addFavoriteFromEditor();
     }
     async addBookmarkManual(filePath, lineStr, label, iconType) {
-        if (!filePath.trim() || !lineStr.trim() || !label.trim()) {
-            vscode.window.showErrorMessage('All fields are required');
+        if (!filePath.trim() || !lineStr.trim()) {
+            vscode.window.showErrorMessage('File path and line number are required');
             return;
         }
         const line = parseInt(lineStr) - 1;
@@ -319,7 +320,9 @@ class CodeAnchorProvider {
         if (!bookmarks[filePath]) {
             bookmarks[filePath] = [];
         }
-        bookmarks[filePath].push({ line, label, iconType: iconType || 'default' });
+        // 同じ行に既存のブックマークがあれば削除（上書き）
+        bookmarks[filePath] = bookmarks[filePath].filter(b => b.line !== line);
+        bookmarks[filePath].push({ line, label: label || '', iconType: iconType || 'default' });
         this.saveBookmarks(bookmarks);
         this.refresh();
         const editor = vscode.window.activeTextEditor;

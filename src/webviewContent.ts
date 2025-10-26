@@ -178,6 +178,78 @@ export function getHtmlContent(): string {
       }
     });
     
+    // キーボードイベントハンドラを追加
+    document.addEventListener('keydown', (e) => {
+      // Escキー: フォーカス中のフォームだけをキャンセル
+      if (e.key === 'Escape') {
+        const favoriteForm = document.getElementById('favoriteForm');
+        const bookmarkForm = document.getElementById('bookmarkForm');
+        
+        // フォーカスがどのフォーム内にあるか確認
+        if (favoriteForm && favoriteForm.classList.contains('active') && e.target.closest('#favoriteForm')) {
+          cancelAddFavorite();
+          e.preventDefault();
+          return;
+        }
+        
+        if (bookmarkForm && bookmarkForm.classList.contains('active') && e.target.closest('#bookmarkForm')) {
+          cancelAddBookmark();
+          e.preventDefault();
+          return;
+        }
+        
+        // 編集フォーム内でEscが押された場合
+        const activeEditForm = e.target.closest('.edit-form.active');
+        if (activeEditForm) {
+          activeEditForm.classList.remove('active');
+          editingFavorite = null;
+          editingBookmark = null;
+          e.preventDefault();
+          return;
+        }
+      }
+      
+      // Enterキー: フォームを送信
+      if (e.key === 'Enter' && !e.shiftKey) {
+        const favoriteForm = document.getElementById('favoriteForm');
+        const bookmarkForm = document.getElementById('bookmarkForm');
+        
+        if (favoriteForm && favoriteForm.classList.contains('active')) {
+          // Favorite追加フォーム内でEnter
+          if (e.target.closest('#favoriteForm')) {
+            addFavorite();
+            e.preventDefault();
+          }
+        } else if (bookmarkForm && bookmarkForm.classList.contains('active')) {
+          // Bookmark追加フォーム内でEnter
+          if (e.target.closest('#bookmarkForm')) {
+            addBookmarkManual();
+            e.preventDefault();
+          }
+        }
+        
+        // 編集フォーム内でEnter
+        const activeEditForm = document.querySelector('.edit-form.active');
+        if (activeEditForm && e.target.closest('.edit-form.active')) {
+          const formId = activeEditForm.id;
+          if (formId.startsWith('edit-fav-')) {
+            // Favorite編集フォーム
+            if (editingFavorite) {
+              saveEditFavorite(editingFavorite);
+              e.preventDefault();
+            }
+          } else if (formId.startsWith('edit-bm-')) {
+            // Bookmark編集フォーム
+            if (editingBookmark) {
+              const [filePath, line] = editingBookmark.split(':');
+              saveEditBookmark(filePath, parseInt(line));
+              e.preventDefault();
+            }
+          }
+        }
+      }
+    });
+    
     window.addEventListener('load', () => { loadState(); vscode.postMessage({ command: 'ready' }); });
     
     window.addEventListener('message', event => {
@@ -232,8 +304,8 @@ export function getHtmlContent(): string {
       const filePath = document.getElementById('bookmarkFile').value;
       const line = document.getElementById('bookmarkLine').value;
       const label = document.getElementById('bookmarkLabel').value;
-      if (filePath && line && label) {
-        vscode.postMessage({ command: 'addBookmarkManual', filePath, line, label, iconType: selectedBookmarkIcon });
+      if (filePath && line) {  // labelは必須チェックから除外
+        vscode.postMessage({ command: 'addBookmarkManual', filePath, line, label: label || '', iconType: selectedBookmarkIcon });
         cancelAddBookmark();
       }
     }
