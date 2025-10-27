@@ -1,14 +1,19 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { FavoriteFile, Bookmark, BookmarksData, BookmarkIconType, ICON_TYPE_LABELS } from './types';
+import * as os from 'os';
+import { FavoriteFile, Bookmark, BookmarksData, BookmarkIconType, ICON_TYPE_LABELS, FavoriteMode } from './types';
 import { getHtmlContent } from './webviewContent';
 
 export class CodeAnchorProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
   private decorationTypes?: Map<BookmarkIconType, vscode.TextEditorDecorationType>;
+  private favoriteMode: FavoriteMode = 'global'; // デフォルトはGlobal
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {
+    // 前回のモードを復元
+    this.favoriteMode = this.context.workspaceState.get('favoriteMode', 'global');
+  }
 
   setDecorationTypes(decorationTypes: Map<BookmarkIconType, vscode.TextEditorDecorationType>) {
     this.decorationTypes = decorationTypes;
@@ -18,7 +23,6 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
     console.log('Resolving webview view...');
     this._view = webviewView;
 
-    // カスタムアイコンのディレクトリを取得
     const customIconDirs = this.getCustomIconDirectories();
     
     webviewView.webview.options = {
@@ -37,10 +41,8 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
       console.error('Error setting webview HTML:', error);
     }
 
-    // アイコンパスを送信
     this.sendIconPaths(webviewView);
 
-    // メッセージハンドラ
     webviewView.webview.onDidReceiveMessage(async (message) => {
       console.log('Received message from webview:', message.command);
       switch (message.command) {
@@ -68,12 +70,16 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
         case 'jumpToBookmark':
           await this.jumpToBookmark(message.filePath, message.line);
           break;
+        case 'switchFavoriteMode':
+          await this.switchFavoriteMode(message.mode);
+          break;
         case 'refresh':
           this.refresh();
           break;
         case 'ready':
           console.log('Webview ready, sending initial data');
           this.sendIconPaths(webviewView);
+          this.sendFavoriteMode();
           this.refresh();
           break;
       }
@@ -82,7 +88,6 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
     this.refresh();
   }
 
-  // カスタムアイコンのディレクトリを取得
   private getCustomIconDirectories(): vscode.Uri[] {
     const dirs = new Set<string>();
     const config = vscode.workspace.getConfiguration('code-anchor');
@@ -111,7 +116,6 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
     return Array.from(dirs).map(dir => vscode.Uri.file(dir));
   }
 
-  // アイコンパスを webview に送信
   private sendIconPaths(webviewView: vscode.WebviewView) {
     const iconTypes: BookmarkIconType[] = ['default', 'todo', 'bug', 'note', 'important', 'question'];
     const iconPaths: { [key: string]: string } = {};
@@ -124,7 +128,6 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
         console.log(`Icon path for ${iconType}: ${iconPath} -> ${iconPaths[iconType]}`);
       } catch (error) {
         console.error(`Error converting icon path for ${iconType}:`, error);
-        // フォールバック：デフォルトアイコンを使用
         const defaultPath = this.context.asAbsolutePath(path.join('resources', `bookmark-${iconType}.png`));
         const webviewUri = webviewView.webview.asWebviewUri(vscode.Uri.file(defaultPath));
         iconPaths[iconType] = webviewUri.toString();
@@ -139,38 +142,122 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private sendFavoriteMode() {
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: 'setFavoriteMode',
+        mode: this.favoriteMode
+      });
+    }
+  }
+
+  // Global Favoritesのパスを取得
+  private getGlobalFavoritesPath(): string {
+    const homeDir = os.homedir();
+    const configDir = path.join(homeDir, '.vscode');
+    
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    return path.join(configDir, 'code-anchor-favorites.json');
+  }
+
+  // Local Favoritesのパスを取得
+  private getLocalFavoritesPath(): string {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) return '';
+
+    const vscodeFolder = path.join(workspaceFolders[0].uri.fsPath, '.vscode');
+    if (!fs.existsSync(vscodeFolder)) {
+      fs.mkdirSync(vscodeFolder);
+    }
+
+    return path.join(vscodeFolder, 'favorites.json');
+  }
+
+  // 現在のモードに応じたFavoritesパスを取得
+  private getCurrentFavoritesPath(): string {
+    return this.favoriteMode === 'global' 
+      ? this.getGlobalFavoritesPath() 
+      : this.getLocalFavoritesPath();
+  }
+
+  // Favoritesを読み込む
+  private loadFavorites(): { [key: string]: FavoriteFile } {
+    const favoritesPath = this.getCurrentFavoritesPath();
+    
+    if (!favoritesPath || !fs.existsSync(favoritesPath)) {
+      return {};
+    }
+
+    try {
+      const content = fs.readFileSync(favoritesPath, 'utf-8');
+      return JSON.parse(content);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+      return {};
+    }
+  }
+
+  // Favoritesを保存する
+  private saveFavorites(favorites: { [key: string]: FavoriteFile }) {
+    const favoritesPath = this.getCurrentFavoritesPath();
+    
+    if (!favoritesPath) {
+      vscode.window.showErrorMessage('No workspace folder is open');
+      return;
+    }
+
+    try {
+      fs.writeFileSync(favoritesPath, JSON.stringify(favorites, null, 2));
+    } catch (error) {
+      console.error('Error saving favorites:', error);
+      vscode.window.showErrorMessage('Failed to save favorites');
+    }
+  }
+
+  // モード切り替え
+  private async switchFavoriteMode(mode: FavoriteMode) {
+    this.favoriteMode = mode;
+    await this.context.workspaceState.update('favoriteMode', mode);
+    this.sendFavoriteMode();
+    this.refresh();
+    vscode.window.showInformationMessage(`Switched to ${mode} favorites`);
+  }
+
   private async addFavorite(filePath: string, description: string) {
     if (!filePath.trim()) {
       vscode.window.showErrorMessage('File path is required');
       return;
     }
 
-    const favorites = this.context.globalState.get<{ [key: string]: FavoriteFile }>('favorites', {});
+    const favorites = this.loadFavorites();
     favorites[filePath] = { path: filePath, description };
-    await this.context.globalState.update('favorites', favorites);
+    this.saveFavorites(favorites);
 
     this.refresh();
     vscode.window.showInformationMessage(`Added "${filePath}" to favorites`);
   }
 
   private async editFavorite(oldPath: string, newPath: string, description: string) {
-    const favorites = this.context.globalState.get<{ [key: string]: FavoriteFile }>('favorites', {});
+    const favorites = this.loadFavorites();
     
     if (oldPath !== newPath) {
       delete favorites[oldPath];
     }
     
     favorites[newPath] = { path: newPath, description };
-    await this.context.globalState.update('favorites', favorites);
+    this.saveFavorites(favorites);
 
     this.refresh();
     vscode.window.showInformationMessage(`Updated "${newPath}"`);
   }
 
   private async removeFavorite(filePath: string) {
-    const favorites = this.context.globalState.get<{ [key: string]: FavoriteFile }>('favorites', {});
+    const favorites = this.loadFavorites();
     delete favorites[filePath];
-    await this.context.globalState.update('favorites', favorites);
+    this.saveFavorites(favorites);
     this.refresh();
   }
 
@@ -192,13 +279,11 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  // カスタムアイコンパスを取得
   private getIconPath(iconType: BookmarkIconType): string {
     const config = vscode.workspace.getConfiguration('code-anchor');
     let customPath = config.get<string>(`icons.${iconType}`);
     
     if (customPath && customPath.trim() !== '') {
-      // 引用符を除去
       customPath = customPath.trim().replace(/^["']|["']$/g, '');
       
       let absolutePath = customPath;
@@ -492,7 +577,7 @@ export class CodeAnchorProvider implements vscode.WebviewViewProvider {
   refresh() {
     console.log('Refreshing webview...');
     if (this._view) {
-      const favorites = this.context.globalState.get('favorites', {});
+      const favorites = this.loadFavorites();
       const bookmarks = this.loadBookmarks();
       
       console.log('Sending update to webview - favorites:', favorites, 'bookmarks:', bookmarks);

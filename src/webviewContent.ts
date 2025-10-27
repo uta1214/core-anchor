@@ -6,7 +6,12 @@ export function getHtmlContent(): string {
   <style>
     body { padding: 10px; font-family: var(--vscode-font-family); color: var(--vscode-foreground); }
     .section { margin-bottom: 20px; }
-    .section-header { font-weight: bold; margin-bottom: 8px; font-size: 11px; }
+    .section-header { font-weight: bold; margin-bottom: 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; }
+    .section-title { flex: 1; }
+    .mode-switch { display: flex; gap: 4px; }
+    .mode-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 2px 8px; cursor: pointer; font-size: 10px; }
+    .mode-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .mode-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
     .add-btn-container { margin: 8px 0; text-align: center; }
     .toggle-add-btn { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 4px 12px; cursor: pointer; font-size: 11px; width: 100%; }
     .toggle-add-btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
@@ -68,7 +73,13 @@ export function getHtmlContent(): string {
 </head>
 <body>
   <div class="section">
-    <div class="section-header">⭐ Favorite Files</div>
+    <div class="section-header">
+      <span class="section-title">⭐ Favorite Files</span>
+      <div class="mode-switch">
+        <button class="mode-btn" id="globalModeBtn" onclick="switchFavoriteMode('global')">Global</button>
+        <button class="mode-btn" id="localModeBtn" onclick="switchFavoriteMode('local')">Local</button>
+      </div>
+    </div>
     <div class="debug-info" id="favoriteDebug">Waiting...</div>
     <div id="favorites"></div>
     <div class="add-btn-container">
@@ -118,6 +129,7 @@ export function getHtmlContent(): string {
     let selectedBookmarkIcon = 'default';
     const editIconSelects = new Map();
     let iconPaths = {};
+    let currentFavoriteMode = 'global';
     const ICON_LABELS = {'default':'Default','todo':'TODO','bug':'Bug','note':'Note','important':'Important','question':'Question'};
     
     function safeId(str) { return 'id-' + encodeURIComponent(str).replace(/%/g, '_'); }
@@ -129,11 +141,35 @@ export function getHtmlContent(): string {
         if (state.expandedFolders) state.expandedFolders.forEach(id => expandedFolders.add(id));
         if (state.expandedFiles) state.expandedFiles.forEach(id => expandedFiles.add(id));
         if (state.iconPaths) iconPaths = state.iconPaths;
+        if (state.favoriteMode) currentFavoriteMode = state.favoriteMode;
       }
+      updateModeButtons();
     }
     
     function saveState() {
-      vscode.setState({ expandedFolders: Array.from(expandedFolders), expandedFiles: Array.from(expandedFiles), iconPaths: iconPaths });
+      vscode.setState({ 
+        expandedFolders: Array.from(expandedFolders), 
+        expandedFiles: Array.from(expandedFiles), 
+        iconPaths: iconPaths,
+        favoriteMode: currentFavoriteMode
+      });
+    }
+    
+    function updateModeButtons() {
+      const globalBtn = document.getElementById('globalModeBtn');
+      const localBtn = document.getElementById('localModeBtn');
+      
+      if (globalBtn && localBtn) {
+        globalBtn.classList.toggle('active', currentFavoriteMode === 'global');
+        localBtn.classList.toggle('active', currentFavoriteMode === 'local');
+      }
+    }
+    
+    function switchFavoriteMode(mode) {
+      currentFavoriteMode = mode;
+      updateModeButtons();
+      saveState();
+      vscode.postMessage({ command: 'switchFavoriteMode', mode: mode });
     }
     
     function setIconImages() {
@@ -261,6 +297,10 @@ export function getHtmlContent(): string {
         iconPaths = msg.paths;
         saveState();
         setIconImages();
+      } else if (msg.command === 'setFavoriteMode') {
+        currentFavoriteMode = msg.mode;
+        updateModeButtons();
+        saveState();
       }
     });
     
@@ -304,7 +344,7 @@ export function getHtmlContent(): string {
       const filePath = document.getElementById('bookmarkFile').value;
       const line = document.getElementById('bookmarkLine').value;
       const label = document.getElementById('bookmarkLabel').value;
-      if (filePath && line) {  // labelは必須チェックから除外
+      if (filePath && line) {
         vscode.postMessage({ command: 'addBookmarkManual', filePath, line, label: label || '', iconType: selectedBookmarkIcon });
         cancelAddBookmark();
       }
@@ -410,7 +450,7 @@ export function getHtmlContent(): string {
         return;
       }
       const entries = Object.entries(favorites);
-      debug.textContent = entries.length + ' favorites';
+      debug.textContent = entries.length + ' favorites (' + currentFavoriteMode + ')';
       if (entries.length === 0) {
         container.innerHTML = '<div class="empty-text">No files</div>';
         return;
