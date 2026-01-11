@@ -72,7 +72,7 @@ function updateDecorationTypes(context, provider) {
     console.log('Updating decoration types...');
     decorationTypes.forEach(decoration => decoration.dispose());
     decorationTypes.clear();
-    const iconTypes = ['default', 'todo', 'bug', 'note', 'important', 'question'];
+    const iconTypes = ['default', 'todo', 'bug', 'note', 'important', 'question', 'all'];
     iconTypes.forEach(iconType => {
         const iconPath = getIconPath(context, iconType);
         const decorationType = vscode.window.createTextEditorDecorationType({
@@ -139,6 +139,14 @@ function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand('code-anchor.addFavorite', async () => {
         console.log('Add favorite command executed');
         await provider.addFavoriteFromCommand();
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('code-anchor.moveBookmarkUp', async () => {
+        console.log('Move bookmark up command executed');
+        await provider.moveBookmarkUp();
+    }));
+    context.subscriptions.push(vscode.commands.registerCommand('code-anchor.moveBookmarkDown', async () => {
+        console.log('Move bookmark down command executed');
+        await provider.moveBookmarkDown();
     }));
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (editor) {

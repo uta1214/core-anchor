@@ -24,6 +24,14 @@
         "command": "code-anchor.addFavorite",
         "title": "Code Anchor: Add to Favorites",
         "icon": "$(star)"
+      },
+      {
+        "command": "code-anchor.moveBookmarkUp",
+        "title": "Code Anchor: Move Bookmark Up"
+      },
+      {
+        "command": "code-anchor.moveBookmarkDown",
+        "title": "Code Anchor: Move Bookmark Down"
       }
     ],
     "keybindings": [
@@ -37,6 +45,18 @@
         "command": "code-anchor.addFavorite",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "code-anchor.moveBookmarkUp",
+        "key": "ctrl+alt+up",
+        "mac": "cmd+alt+up",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "code-anchor.moveBookmarkDown",
+        "key": "ctrl+alt+down",
+        "mac": "cmd+alt+down",
         "when": "editorTextFocus"
       }
     ],
@@ -105,6 +125,11 @@
           "type": "string",
           "default": "",
           "description": "Path to custom icon for Question bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+        },
+        "code-anchor.icons.all": {
+          "type": "string",
+          "default": "",
+          "description": "Path to custom icon for All Icons filter (leave empty to use default icon). You can use absolute path or relative path from workspace root."
         }
       }
     }

@@ -7,6 +7,7 @@ exports.ICON_TYPE_LABELS = {
     bug: 'Bug',
     note: 'Note',
     important: 'Important',
-    question: 'Question'
+    question: 'Question',
+    all: 'All'
 };
 //# sourceMappingURL=types.js.map

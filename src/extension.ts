@@ -47,7 +47,7 @@ function updateDecorationTypes(context: vscode.ExtensionContext, provider: CodeA
   decorationTypes.forEach(decoration => decoration.dispose());
   decorationTypes.clear();
   
-  const iconTypes: BookmarkIconType[] = ['default', 'todo', 'bug', 'note', 'important', 'question'];
+  const iconTypes: BookmarkIconType[] = ['default', 'todo', 'bug', 'note', 'important', 'question', 'all'];
   
   iconTypes.forEach(iconType => {
     const iconPath = getIconPath(context, iconType);
@@ -134,6 +134,20 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('code-anchor.addFavorite', async () => {
       console.log('Add favorite command executed');
       await provider.addFavoriteFromCommand();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('code-anchor.moveBookmarkUp', async () => {
+      console.log('Move bookmark up command executed');
+      await provider.moveBookmarkUp();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('code-anchor.moveBookmarkDown', async () => {
+      console.log('Move bookmark down command executed');
+      await provider.moveBookmarkDown();
     })
   );
 
