@@ -135,9 +135,13 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+  "vscode:prepublish": "npm run compile && npm run copy-resources",
+  "compile": "tsc -p ./ && npm run copy-resources",
+  "copy-resources": "cp -r src/webview/template.html out/webview/ && cp -r src/webview/styles.css out/webview/ && cp -r src/webview/scripts out/webview/",
+  "watch": "tsc -watch -p ./",
+  "pretest": "npm run compile && npm run lint",
+  "lint": "eslint src --ext ts",
+  "test": "vscode-test"
   },
   "devDependencies": {
     "@types/vscode": "^1.80.0",

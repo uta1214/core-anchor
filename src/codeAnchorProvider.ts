@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { FavoriteFile, Bookmark, BookmarksData, BookmarkIconType, ICON_TYPE_LABELS, FavoriteMode, SortType, FavoritesMeta, BookmarksMeta } from './types';
-import { getHtmlContent } from './webviewContent';
+import { getHtmlContent } from './webview/index';
 
 export class CodeAnchorProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;

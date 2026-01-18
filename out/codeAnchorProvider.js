@@ -39,7 +39,7 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const types_1 = require("./types");
-const webviewContent_1 = require("./webviewContent");
+const index_1 = require("./webview/index");
 class CodeAnchorProvider {
     constructor(context) {
         this.context = context;
@@ -899,7 +899,7 @@ class CodeAnchorProvider {
         return JSON.parse(content);
     }
     getHtmlContent() {
-        return (0, webviewContent_1.getHtmlContent)();
+        return (0, index_1.getHtmlContent)();
     }
     updateDecorations(editor) {
         if (!this.decorationTypes)
