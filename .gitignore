@@ -1,18 +1,31 @@
-# 全部無視
-*
+# ===== Node.js =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# gitignore 自体は追跡
-!.gitignore
+# ===== VSCode extension build =====
+out/
+*.vsix
 
-# ディレクトリごと追跡
-!src/
-!out/
+# ===== gtags generated files =====
+GTAGS
+GRTAGS
+GPATH
 
-# ディレクトリ内の特定のファイルだけ追跡
-!src/**/*.ts
-!out/**/*.js
+# ===== VSCode =====
+.vscode/
+.vscode-test/
 
-# ルート直下のファイル
-!tsconfig.json
-!package.json
-!*.vsix
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== misc =====
+*.log
+
+# ===== images =====
+*.jpg
+*.jpeg
+*.png
+*.bmp
