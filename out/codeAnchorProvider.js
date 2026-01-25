@@ -51,6 +51,35 @@ class CodeAnchorProvider {
     setDecorationTypes(decorationTypes) {
         this.decorationTypes = decorationTypes;
     }
+    reloadWebview() {
+        if (this._view) {
+            console.log('Reloading webview...');
+            try {
+                this._view.webview.html = this.getHtmlContent();
+                this.sendIconPaths(this._view);
+                this.sendFavoriteMode();
+                const folderDepth = this.context.workspaceState.get('folderDepth', 1);
+                this._view.webview.postMessage({
+                    command: 'setFolderDepth',
+                    depth: folderDepth
+                });
+                // セクションの表示設定を送信（追加）
+                const config = vscode.workspace.getConfiguration('code-anchor');
+                const showFavorites = config.get('ui.showFavorites', true);
+                const showBookmarks = config.get('ui.showBookmarks', true);
+                this._view.webview.postMessage({
+                    command: 'setSectionVisibility',
+                    showFavorites: showFavorites,
+                    showBookmarks: showBookmarks
+                });
+                this.refresh();
+                console.log('Webview reloaded successfully');
+            }
+            catch (error) {
+                console.error('Error reloading webview:', error);
+            }
+        }
+    }
     resolveWebviewView(webviewView) {
         console.log('Resolving webview view...');
         this._view = webviewView;
@@ -77,6 +106,9 @@ class CodeAnchorProvider {
                 case 'addFavorite':
                     await this.addFavorite(message.path, message.description);
                     break;
+                case 'quickAddCurrentFile':
+                    await this.quickAddCurrentFile();
+                    break;
                 case 'editFavorite':
                     await this.editFavorite(message.oldPath, message.newPath, message.description);
                     break;
@@ -100,6 +132,9 @@ class CodeAnchorProvider {
                     break;
                 case 'switchFavoriteMode':
                     await this.switchFavoriteMode(message.mode);
+                    break;
+                case 'setFolderDepth':
+                    await this.setFolderDepth(message.depth);
                     break;
                 case 'sortFavoriteFolders':
                     await this.sortFavoriteFolders(message.sortType);
@@ -132,6 +167,20 @@ class CodeAnchorProvider {
                     console.log('Webview ready, sending initial data');
                     this.sendIconPaths(webviewView);
                     this.sendFavoriteMode();
+                    const folderDepth = this.context.workspaceState.get('folderDepth', 1);
+                    webviewView.webview.postMessage({
+                        command: 'setFolderDepth',
+                        depth: folderDepth
+                    });
+                    // セクションの表示設定を送信
+                    const config = vscode.workspace.getConfiguration('code-anchor');
+                    const showFavorites = config.get('ui.showFavorites', true);
+                    const showBookmarks = config.get('ui.showBookmarks', true);
+                    webviewView.webview.postMessage({
+                        command: 'setSectionVisibility',
+                        showFavorites: showFavorites,
+                        showBookmarks: showBookmarks
+                    });
                     this.refresh();
                     break;
             }
@@ -352,6 +401,16 @@ class CodeAnchorProvider {
         this.sendFavoriteMode();
         this.refresh();
         vscode.window.showInformationMessage(`Switched to ${mode} favorites`);
+    }
+    // フォルダの深さをセット
+    async setFolderDepth(depth) {
+        await this.context.workspaceState.update('folderDepth', depth);
+        if (this._view) {
+            this._view.webview.postMessage({
+                command: 'setFolderDepth',
+                depth: depth
+            });
+        }
     }
     // Favoriteフォルダをソート
     async sortFavoriteFolders(sortType) {

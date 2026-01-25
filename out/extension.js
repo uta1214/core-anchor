@@ -246,6 +246,15 @@ function activate(context) {
             updateDecorationTypes(context, provider);
             provider.refresh();
         }
+        if (e.affectsConfiguration('code-anchor.ui.theme')) {
+            console.log('Theme configuration changed, reloading webview...');
+            provider.reloadWebview();
+        }
+        if (e.affectsConfiguration('code-anchor.ui.showFavorites') ||
+            e.affectsConfiguration('code-anchor.ui.showBookmarks')) {
+            console.log('Section visibility changed, updating...');
+            provider.reloadWebview();
+        }
     }));
     if (vscode.window.activeTextEditor) {
         provider.updateDecorations(vscode.window.activeTextEditor);

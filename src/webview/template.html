@@ -8,9 +8,16 @@
   <div class="section">
     <div class="section-header">
       <span class="section-title">⭐ Favorite Files</span>
-      <div class="mode-switch">
-        <button class="mode-btn" id="globalModeBtn" onclick="switchFavoriteMode('global')">Global</button>
-        <button class="mode-btn" id="localModeBtn" onclick="switchFavoriteMode('local')">Local</button>
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <button class="depth-btn" onclick="decreaseFolderDepth()" title="Decrease folder depth">−</button>
+          <span class="depth-display" id="folderDepthDisplay">1</span>
+          <button class="depth-btn" onclick="increaseFolderDepth()" title="Increase folder depth">+</button>
+        </div>
+        <div class="mode-switch">
+          <button class="mode-btn" id="globalModeBtn" onclick="switchFavoriteMode('global')">Global</button>
+          <button class="mode-btn" id="localModeBtn" onclick="switchFavoriteMode('local')">Local</button>
+        </div>
       </div>
     </div>
     <div class="search-container">

@@ -1,7 +1,9 @@
 body { 
   padding: 10px; 
   font-family: var(--vscode-font-family); 
-  color: var(--vscode-foreground); 
+  color: var(--vscode-foreground);
+  container-type: inline-size;
+  container-name: sidebar;
 }
 
 .section { 
@@ -14,11 +16,17 @@ body {
   font-size: 11px; 
   display: flex; 
   align-items: center; 
-  justify-content: space-between; 
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
 }
 
 .section-title { 
-  flex: 1; 
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 40px;
 }
 
 .icon-filter { 
@@ -51,7 +59,9 @@ body {
 
 .mode-switch { 
   display: flex; 
-  gap: 4px; 
+  gap: 4px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .mode-btn { 
@@ -60,7 +70,9 @@ body {
   border: none; 
   padding: 2px 8px; 
   cursor: pointer; 
-  font-size: 10px; 
+  font-size: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .mode-btn:hover { 
@@ -70,6 +82,30 @@ body {
 .mode-btn.active { 
   background: var(--vscode-button-background); 
   color: var(--vscode-button-foreground); 
+}
+
+.depth-btn {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  border: none;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  min-width: 24px;
+  flex-shrink: 0;
+}
+
+.depth-btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.depth-display {
+  font-size: 11px;
+  font-weight: bold;
+  min-width: 16px;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .add-btn-container { 
@@ -87,7 +123,11 @@ body {
   padding: 4px 12px; 
   cursor: pointer; 
   font-size: 11px; 
-  width: 100%; 
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 60px;
 }
 
 .toggle-add-btn:hover { 

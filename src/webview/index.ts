@@ -1,13 +1,23 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 
 export function getHtmlContent(): string {
   const htmlPath = path.join(__dirname, 'template.html');
-  const cssPath = path.join(__dirname, 'styles.css');
   const uiJsPath = path.join(__dirname, 'scripts', 'ui.js');
   const favoritesJsPath = path.join(__dirname, 'scripts', 'favorites.js');
   const bookmarksJsPath = path.join(__dirname, 'scripts', 'bookmarks.js');
   const mainJsPath = path.join(__dirname, 'scripts', 'main.js');
+
+  // テーマ設定を取得
+  const config = vscode.workspace.getConfiguration('code-anchor');
+  const theme = config.get<string>('ui.theme', 'modern');
+  
+  // テーマに応じたCSSファイルを選択
+  const cssFileName = `styles-${theme}.css`;
+  const cssPath = path.join(__dirname, cssFileName);
+  
+  console.log(`Loading theme: ${theme}, CSS file: ${cssFileName}`);
 
   const html = fs.readFileSync(htmlPath, 'utf-8');
   const css = fs.readFileSync(cssPath, 'utf-8');
@@ -21,9 +31,9 @@ export function getHtmlContent(): string {
     .replace('<!-- SCRIPT_PLACEHOLDER -->', `
       <script>
         ${uiJs}
+        ${mainJs}
         ${favoritesJs}
         ${bookmarksJs}
-        ${mainJs}
       </script>
-    `);
+  `);
 }

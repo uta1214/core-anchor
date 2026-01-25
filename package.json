@@ -99,49 +99,71 @@
         "code-anchor.icons.default": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for Default bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for Default bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / デフォルトブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.todo": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for TODO bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for TODO bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / TODOブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.bug": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for Bug bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for Bug bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / バグブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.note": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for Note bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for Note bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / メモブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.important": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for Important bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for Important bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / 重要ブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.question": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for Question bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for Question bookmarks (leave empty to use default icon). You can use absolute path or relative path from workspace root. / 質問ブックマーク用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
         },
         "code-anchor.icons.all": {
           "type": "string",
           "default": "",
-          "description": "Path to custom icon for All Icons filter (leave empty to use default icon). You can use absolute path or relative path from workspace root."
+          "description": "Path to custom icon for All Icons filter (leave empty to use default icon). You can use absolute path or relative path from workspace root. / すべてのアイコンフィルター用のカスタムアイコンパス（空欄でデフォルトアイコンを使用）。絶対パスまたはワークスペースルートからの相対パスを指定できます。"
+        },
+        "code-anchor.ui.theme": {
+          "type": "string",
+          "default": "modern",
+          "enum": ["classic", "modern", "soft", "pop"],
+          "enumDescriptions": [
+            "Classic design (original look) / クラシックデザイン（オリジナルの外観）",
+            "Modern design (compact and simple) / モダンデザイン（コンパクトでシンプル）",
+            "Soft design (gentle gradients) / ソフトデザイン（やわらかいグラデーション）",
+            "Pop design (colorful and vibrant) / ポップデザイン（カラフルで華やか）"
+          ],
+          "description": "Select UI theme for Code Anchor sidebar / Code Anchorサイドバーのテーマを選択"
+        },
+        "code-anchor.ui.showFavorites": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Favorite Files section / お気に入りファイルセクションを表示"
+        },
+        "code-anchor.ui.showBookmarks": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Bookmarks section / ブックマークセクションを表示"
         }
       }
     }
   },
   "scripts": {
-  "vscode:prepublish": "npm run compile && npm run copy-resources",
-  "compile": "tsc -p ./ && npm run copy-resources",
-  "copy-resources": "cp -r src/webview/template.html out/webview/ && cp -r src/webview/styles.css out/webview/ && cp -r src/webview/scripts out/webview/",
-  "watch": "tsc -watch -p ./",
-  "pretest": "npm run compile && npm run lint",
-  "lint": "eslint src --ext ts",
-  "test": "vscode-test"
+    "vscode:prepublish": "npm run compile && npm run copy-resources",
+    "compile": "tsc -p ./ && npm run copy-resources",
+    "copy-resources": "mkdir -p out/webview/scripts && cp src/webview/template.html out/webview/ && cp src/webview/styles-*.css out/webview/ && cp src/webview/scripts/*.js out/webview/scripts/",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "vscode-test"
   },
   "devDependencies": {
     "@types/vscode": "^1.80.0",

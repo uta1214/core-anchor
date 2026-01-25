@@ -37,6 +37,23 @@ function updateFolderDepthDisplay() {
   }
 }
 
+function switchFavoriteMode(mode) {
+  currentFavoriteMode = mode;
+  updateModeButtons();
+  saveState();
+  vscode.postMessage({ command: 'switchFavoriteMode', mode: mode });
+}
+
+function updateModeButtons() {
+  const globalBtn = document.getElementById('globalModeBtn');
+  const localBtn = document.getElementById('localModeBtn');
+  
+  if (globalBtn && localBtn) {
+    globalBtn.classList.toggle('active', currentFavoriteMode === 'global');
+    localBtn.classList.toggle('active', currentFavoriteMode === 'local');
+  }
+}
+
 function toggleFavoriteForm() {
   const form = document.getElementById('favoriteForm');
   form.classList.toggle('active');
@@ -158,33 +175,7 @@ function updateFavorites(favorites) {
   const tree = buildFolderTree(entries, currentFolderDepth);
   
   container.innerHTML = '';
-  
-  // Root Filesフォルダでラップ
-  const folderId = safeId('__workspace_root__');
-  const isExpanded = expandedFolders.has(folderId);
-  
-  const folderDiv = document.createElement('div');
-  folderDiv.className = 'folder-group';
-  
-  const headerDiv = document.createElement('div');
-  headerDiv.className = 'folder-header';
-  headerDiv.onclick = () => toggleFolder(folderId);
-  
-  const totalFiles = countAllFilesInTree(tree);
-  headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">📁 Workspace Files</span><span class="folder-count">(' + totalFiles + ')</span>';
-  
-  const itemsDiv = document.createElement('div');
-  itemsDiv.id = 'items-' + folderId;
-  itemsDiv.className = 'folder-items' + (isExpanded ? ' expanded' : '');
-  itemsDiv.style.display = isExpanded ? 'block' : 'none';
-  
-  folderDiv.appendChild(headerDiv);
-  folderDiv.appendChild(itemsDiv);
-  container.appendChild(folderDiv);
-  
-  if (isExpanded) {
-    renderFolderTree(tree, itemsDiv, '', 0);
-  }
+  renderFolderTree(tree, container, '', 0);
 }
 
 function buildFolderTree(entries, depth) {
@@ -216,20 +207,16 @@ function buildFolderTree(entries, depth) {
             files: []
           };
         }
-        // 次のレベルに移動
-        if (index < relevantParts.length - 1) {
-          currentLevel = currentLevel[folderName].children;
-        }
+        currentLevel = currentLevel[folderName].children;
       });
       
-      // ファイルを最終フォルダに追加
+      // ファイルを追加
       const lastFolder = relevantParts[relevantParts.length - 1];
-      // 最終フォルダの位置を再度取得
-      let targetLevel = tree;
+      let parent = tree;
       for (let i = 0; i < relevantParts.length - 1; i++) {
-        targetLevel = targetLevel[relevantParts[i]].children;
+        parent = parent[relevantParts[i]].children;
       }
-      targetLevel[lastFolder].files.push({ fullPath: path, fileName, data });
+      parent[lastFolder].files.push({ fullPath: path, fileName, data });
     }
   });
   
@@ -241,15 +228,11 @@ function renderFolderTree(node, container, parentPath, level) {
   
   keys.forEach(key => {
     if (key === '__root__') {
-      // ルートファイルを表示
-      const rootFiles = node[key].files;
-      if (rootFiles.length > 0) {
-        rootFiles.forEach(({ fullPath, fileName, data }) => {
-          const wrapper = createFileItemElement(fullPath, fileName, data);
-          wrapper.style.marginLeft = '0px';
-          container.appendChild(wrapper);
-        });
-      }
+      // ルートファイルを直接表示
+      node[key].files.forEach(({ fullPath, fileName, data }) => {
+        const wrapper = createFileItemElement(fullPath, fileName, data);
+        container.appendChild(wrapper);
+      });
       return;
     }
     
@@ -267,7 +250,7 @@ function renderFolderTree(node, container, parentPath, level) {
       headerDiv.className = 'folder-header';
       headerDiv.onclick = () => toggleFolder(folderId);
       
-      // ファイル数をカウント(子フォルダ含む)
+      // ファイル数をカウント（子フォルダ含む）
       const fileCount = countFilesInTree(item);
       
       headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">📁 ' + escapeHtml(key) + '</span><span class="folder-count">(' + fileCount + ')</span>';
@@ -282,15 +265,15 @@ function renderFolderTree(node, container, parentPath, level) {
       container.appendChild(folderDiv);
       
       if (isExpanded) {
+        // 子フォルダを再帰的にレンダリング
+        renderFolderTree(item.children, itemsDiv, currentPath, level + 1);
+        
         // このフォルダのファイルを表示
         item.files.forEach(({ fullPath, fileName, data }) => {
           const wrapper = createFileItemElement(fullPath, fileName, data);
           wrapper.style.marginLeft = '0px';
           itemsDiv.appendChild(wrapper);
         });
-        
-        // 子フォルダを再帰的にレンダリング
-        renderFolderTree(item.children, itemsDiv, currentPath, level + 1);
       }
     }
   });
@@ -301,18 +284,6 @@ function countFilesInTree(node) {
   Object.values(node.children).forEach(child => {
     if (child.type === 'folder') {
       count += countFilesInTree(child);
-    }
-  });
-  return count;
-}
-
-function countAllFilesInTree(tree) {
-  let count = 0;
-  Object.keys(tree).forEach(key => {
-    if (key === '__root__') {
-      count += tree[key].files.length;
-    } else if (tree[key].type === 'folder') {
-      count += countFilesInTree(tree[key]);
     }
   });
   return count;
@@ -341,19 +312,6 @@ function createFileItemElement(fullPath, fileName, data) {
   return wrapper;
 }
 
-function switchFavoriteMode(mode) {
-  currentFavoriteMode = mode;
-  updateModeButtons();
-  saveState();
-  vscode.postMessage({ command: 'switchFavoriteMode', mode: mode });
-}
-
-function updateModeButtons() {
-  const globalBtn = document.getElementById('globalModeBtn');
-  const localBtn = document.getElementById('localModeBtn');
-  
-  if (globalBtn && localBtn) {
-    globalBtn.classList.toggle('active', currentFavoriteMode === 'global');
-    localBtn.classList.toggle('active', currentFavoriteMode === 'local');
-  }
-}
+// グローバルに公開
+window.increaseFolderDepth = increaseFolderDepth;
+window.decreaseFolderDepth = decreaseFolderDepth;
