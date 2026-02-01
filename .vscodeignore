@@ -1,0 +1,16 @@
+**/.git/**
+**/.vscode/**
+**/node_modules/**
+other/
+resources_moto/
+src/**
+out/**/*.map
+
+*.ts
+tsconfig.json
+tasks.json
+
+*.vsix
+*.log
+*Zone.Identifier
+.gitignore

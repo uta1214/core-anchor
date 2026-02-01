@@ -1,3 +1,34 @@
+/* CSS変数定義 */
+:root {
+  /* Font Sizes */
+  --font-size-section-title: 11px;
+  --font-size-folder-name: 12px;
+  --font-size-file-name: 11px;
+  --font-size-item-file: 11px;
+  --font-size-item-desc: 10px;
+  --font-size-item-line: 9px;
+  --font-size-folder-count: 10px;
+  --font-size-file-count: 10px;
+  --font-size-button: 11px;
+  --font-size-search: 11px;
+  --font-size-debug: 9px;
+  --font-size-mode-btn: 10px;
+  
+  /* Spacing */
+  --spacing-section-margin: 20px;
+  --spacing-item-padding: 6px;
+  --spacing-folder-indent: 16px;
+  
+  /* Border Radius */
+  --border-radius-section: 0px;
+  --border-radius-button: 2px;
+  --border-radius-input: 2px;
+  
+  /* Icon Sizes */
+  --icon-size-small: 14px;
+  --icon-size-medium: 16px;
+}
+
 body { 
   padding: 10px; 
   font-family: var(--vscode-font-family); 
@@ -7,18 +38,40 @@ body {
 }
 
 .section { 
-  margin-bottom: 20px; 
+  margin-bottom: var(--spacing-section-margin); 
 }
 
 .section-header { 
   font-weight: bold; 
   margin-bottom: 8px; 
-  font-size: 11px; 
+  font-size: var(--font-size-section-title); 
   display: flex; 
   align-items: center; 
   justify-content: space-between;
   gap: 8px;
   min-height: 24px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px;
+  border-radius: var(--border-radius-button);
+}
+
+.section-header:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.section-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-collapse-icon {
+  font-size: 10px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
 }
 
 .section-title { 
@@ -29,9 +82,14 @@ body {
   min-width: 40px;
 }
 
+.section-content {
+  display: block;
+}
+
 .icon-filter { 
   display: flex; 
-  align-items: center; 
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .search-container { 
@@ -46,7 +104,8 @@ body {
   border: 1px solid var(--vscode-input-border); 
   font-family: var(--vscode-font-family); 
   box-sizing: border-box; 
-  font-size: 11px; 
+  font-size: var(--font-size-search); 
+  border-radius: var(--border-radius-input);
 }
 
 .search-input:focus { 
@@ -61,18 +120,23 @@ body {
   display: flex; 
   gap: 4px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .mode-btn { 
   background: var(--vscode-button-secondaryBackground); 
   color: var(--vscode-button-secondaryForeground); 
   border: none; 
-  padding: 2px 8px; 
+  padding: 4px 8px; 
   cursor: pointer; 
-  font-size: 10px;
+  font-size: var(--font-size-mode-btn);
   flex-shrink: 0;
   white-space: nowrap;
+  border-radius: var(--border-radius-button);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
 }
 
 .mode-btn:hover { 
@@ -82,6 +146,10 @@ body {
 .mode-btn.active { 
   background: var(--vscode-button-background); 
   color: var(--vscode-button-foreground); 
+}
+
+.mode-btn svg {
+  flex-shrink: 0;
 }
 
 .depth-btn {
@@ -94,6 +162,7 @@ body {
   font-weight: bold;
   min-width: 24px;
   flex-shrink: 0;
+  border-radius: var(--border-radius-button);
 }
 
 .depth-btn:hover {
@@ -101,7 +170,7 @@ body {
 }
 
 .depth-display {
-  font-size: 11px;
+  font-size: var(--font-size-button);
   font-weight: bold;
   min-width: 16px;
   text-align: center;
@@ -122,12 +191,13 @@ body {
   border: none; 
   padding: 4px 12px; 
   cursor: pointer; 
-  font-size: 11px; 
+  font-size: var(--font-size-button); 
   width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 60px;
+  border-radius: var(--border-radius-button);
 }
 
 .toggle-add-btn:hover { 
@@ -148,7 +218,8 @@ body {
   margin: 8px 0; 
   padding: 8px; 
   background: var(--vscode-input-background); 
-  border: 1px solid var(--vscode-input-border); 
+  border: 1px solid var(--vscode-input-border);
+  border-radius: var(--border-radius-input);
 }
 
 .add-form.active { 
@@ -163,7 +234,8 @@ body {
   color: var(--vscode-input-foreground); 
   border: 1px solid var(--vscode-input-border); 
   font-family: var(--vscode-font-family); 
-  box-sizing: border-box; 
+  box-sizing: border-box;
+  border-radius: var(--border-radius-input);
 }
 
 .add-form button { 
@@ -173,7 +245,8 @@ body {
   padding: 4px 8px; 
   cursor: pointer; 
   width: 100%; 
-  margin-top: 4px; 
+  margin-top: 4px;
+  border-radius: var(--border-radius-button);
 }
 
 .add-form button:hover { 
@@ -181,12 +254,13 @@ body {
 }
 
 .item { 
-  padding: 6px; 
+  padding: var(--spacing-item-padding); 
   margin: 4px 0; 
   display: flex; 
   justify-content: space-between; 
   align-items: center; 
-  position: relative; 
+  position: relative;
+  border-radius: var(--border-radius-button);
 }
 
 .item:hover { 
@@ -199,18 +273,20 @@ body {
 }
 
 .item-file { 
-  font-size: 11px; 
+  font-size: var(--font-size-item-file); 
   color: var(--vscode-foreground); 
-  margin-bottom: 2px; 
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
 }
 
 .item-desc { 
-  font-size: 10px; 
+  font-size: var(--font-size-item-desc); 
   color: var(--vscode-descriptionForeground); 
 }
 
 .item-line { 
-  font-size: 9px; 
+  font-size: var(--font-size-item-line); 
   color: var(--vscode-descriptionForeground); 
   margin-top: 2px; 
 }
@@ -225,9 +301,18 @@ body {
   border: none; 
   color: var(--vscode-foreground); 
   cursor: pointer; 
-  padding: 2px 6px; 
+  padding: 4px 6px; 
   opacity: 0.6; 
-  font-size: 12px; 
+  font-size: 12px;
+  border-radius: var(--border-radius-button);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.btn svg {
+  display: block;
 }
 
 .btn:hover { 
@@ -245,7 +330,8 @@ body {
   padding: 4px 6px; 
   cursor: pointer; 
   user-select: none; 
-  background: var(--vscode-sideBar-background); 
+  background: var(--vscode-sideBar-background);
+  border-radius: var(--border-radius-button);
 }
 
 .folder-header:hover { 
@@ -264,19 +350,21 @@ body {
 }
 
 .folder-name { 
-  font-size: 12px; 
+  font-size: var(--font-size-folder-name); 
   font-weight: 500; 
-  color: var(--vscode-foreground); 
+  color: var(--vscode-foreground);
+  display: flex;
+  align-items: center;
 }
 
 .folder-count { 
   margin-left: 6px; 
-  font-size: 10px; 
+  font-size: var(--font-size-folder-count); 
   color: var(--vscode-descriptionForeground); 
 }
 
 .folder-items { 
-  padding-left: 16px; 
+  padding-left: var(--spacing-folder-indent); 
   display: none; 
 }
 
@@ -294,7 +382,8 @@ body {
   padding: 4px 6px; 
   cursor: pointer; 
   user-select: none; 
-  background: var(--vscode-sideBar-background); 
+  background: var(--vscode-sideBar-background);
+  border-radius: var(--border-radius-button);
 }
 
 .file-header:hover { 
@@ -313,7 +402,7 @@ body {
 }
 
 .file-name { 
-  font-size: 11px; 
+  font-size: var(--font-size-file-name); 
   font-weight: 500; 
   color: var(--vscode-foreground); 
   flex: 1; 
@@ -321,12 +410,12 @@ body {
 
 .file-count { 
   margin-left: 6px; 
-  font-size: 10px; 
+  font-size: var(--font-size-file-count); 
   color: var(--vscode-descriptionForeground); 
 }
 
 .file-items { 
-  padding-left: 16px; 
+  padding-left: var(--spacing-folder-indent); 
   display: none; 
 }
 
@@ -339,7 +428,8 @@ body {
   padding: 8px; 
   background: var(--vscode-input-background); 
   border: 1px solid var(--vscode-input-border); 
-  margin-top: 4px; 
+  margin-top: 4px;
+  border-radius: var(--border-radius-input);
 }
 
 .edit-form.active { 
@@ -355,7 +445,8 @@ body {
   color: var(--vscode-input-foreground); 
   border: 1px solid var(--vscode-input-border); 
   font-family: var(--vscode-font-family); 
-  box-sizing: border-box; 
+  box-sizing: border-box;
+  border-radius: var(--border-radius-input);
 }
 
 .edit-form-buttons { 
@@ -369,7 +460,8 @@ body {
   padding: 4px 8px; 
   cursor: pointer; 
   border: none; 
-  font-size: 11px; 
+  font-size: var(--font-size-button);
+  border-radius: var(--border-radius-button);
 }
 
 .save-btn { 
@@ -396,19 +488,20 @@ body {
 }
 
 .empty-text { 
-  font-size: 11px; 
+  font-size: var(--font-size-button); 
   color: var(--vscode-descriptionForeground); 
   padding: 8px; 
   text-align: center; 
 }
 
 .debug-info { 
-  font-size: 9px; 
+  font-size: var(--font-size-debug); 
   color: var(--vscode-descriptionForeground); 
   padding: 4px; 
   background: var(--vscode-input-background); 
   margin: 4px 0; 
-  font-family: monospace; 
+  font-family: monospace;
+  border-radius: var(--border-radius-input);
 }
 
 .custom-select { 
@@ -427,7 +520,8 @@ body {
   display: flex; 
   align-items: center; 
   justify-content: space-between; 
-  box-sizing: border-box; 
+  box-sizing: border-box;
+  border-radius: var(--border-radius-input);
 }
 
 .custom-select-trigger:hover { 
@@ -441,8 +535,8 @@ body {
 }
 
 .custom-select-icon { 
-  width: 16px; 
-  height: 16px; 
+  width: var(--icon-size-medium); 
+  height: var(--icon-size-medium); 
   object-fit: contain; 
 }
 
@@ -460,7 +554,8 @@ body {
   border: 1px solid var(--vscode-input-border); 
   max-height: 200px; 
   overflow-y: auto; 
-  z-index: 1000; 
+  z-index: 1000;
+  border-radius: var(--border-radius-input);
 }
 
 .custom-select-options.active { 
@@ -486,7 +581,8 @@ body {
   border: 1px solid var(--vscode-menu-border); 
   box-shadow: 0 2px 8px rgba(0,0,0,0.3); 
   z-index: 10000; 
-  min-width: 150px; 
+  min-width: 150px;
+  border-radius: var(--border-radius-input);
 }
 
 .context-menu.active { 
@@ -496,7 +592,7 @@ body {
 .context-menu-item { 
   padding: 6px 12px; 
   cursor: pointer; 
-  font-size: 11px; 
+  font-size: var(--font-size-button); 
   color: var(--vscode-menu-foreground); 
 }
 
@@ -509,4 +605,26 @@ body {
   height: 1px; 
   background: var(--vscode-menu-separatorBackground); 
   margin: 4px 0; 
+}
+
+/* レスポンシブ調整 */
+@container sidebar (max-width: 280px) {
+  :root {
+    --font-size-section-title: 9px;
+    --font-size-folder-name: 10px;
+    --font-size-item-file: 9px;
+    --font-size-item-desc: 8px;
+  }
+}
+
+@container sidebar (max-width: 220px) {
+  .folder-count, .file-count {
+    display: none;
+  }
+  .item-desc {
+    display: none;
+  }
+  .debug-info {
+    display: none;
+  }
 }

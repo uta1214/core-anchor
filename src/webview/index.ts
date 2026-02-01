@@ -10,14 +10,12 @@ export function getHtmlContent(): string {
   const mainJsPath = path.join(__dirname, 'scripts', 'main.js');
 
   // テーマ設定を取得
-  const config = vscode.workspace.getConfiguration('code-anchor');
-  const theme = config.get<string>('ui.theme', 'modern');
+  const config = vscode.workspace.getConfiguration('core-anchor');
+  const theme = config.get<string>('ui.theme', 'classic');
   
   // テーマに応じたCSSファイルを選択
   const cssFileName = `styles-${theme}.css`;
   const cssPath = path.join(__dirname, cssFileName);
-  
-  console.log(`Loading theme: ${theme}, CSS file: ${cssFileName}`);
 
   const html = fs.readFileSync(htmlPath, 'utf-8');
   const css = fs.readFileSync(cssPath, 'utf-8');

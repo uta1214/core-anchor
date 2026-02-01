@@ -10,6 +10,30 @@ function escapeHtml(text) {
   return div.innerHTML; 
 }
 
+// ファイル拡張子からアイコンを取得
+function getFileIcon(fileName) {
+  const ext = fileName.split('.').pop().toLowerCase();
+  const iconMap = {
+    'js': 'javascript',
+    'ts': 'typescript',
+    'jsx': 'react',
+    'tsx': 'react',
+    'html': 'html',
+    'css': 'css',
+    'json': 'json',
+    'md': 'markdown',
+    'py': 'python',
+    'java': 'java',
+    'cpp': 'cpp',
+    'c': 'c',
+    'rs': 'rust',
+    'go': 'go'
+  };
+  
+  const iconType = iconMap[ext] || 'file';
+  return getIcon('file', 'file-type-icon');
+}
+
 // Context Menu
 function showContextMenu(e, items) {
   e.preventDefault();
@@ -86,6 +110,9 @@ function setIconImages() {
   if (opts) {
     opts.innerHTML = '';
     Object.keys(ICON_LABELS).forEach(iconType => {
+      // 'all'アイコンはブックマーク登録時のセレクトに表示しない
+      if (iconType === 'all') return;
+      
       const opt = document.createElement('div');
       opt.className = 'custom-select-option';
       opt.onclick = () => selectIcon('bookmarkIconSelect', iconType, ICON_LABELS[iconType]);
@@ -101,16 +128,25 @@ function setIconImages() {
     const allOpt = document.createElement('div');
     allOpt.className = 'custom-select-option';
     allOpt.onclick = () => selectIconFilter('', 'All Icons');
-    allOpt.innerHTML = '<span style="margin-left:22px;">All Icons</span>';
+    // All Iconsにもアイコンを表示
+    allOpt.innerHTML = '<img class="custom-select-icon" src="' + (iconPaths['all'] || '') + '" /><span>All Icons</span>';
     filterOpts.appendChild(allOpt);
     
     Object.keys(ICON_LABELS).forEach(iconType => {
+      if (iconType === 'all') return; // allは上で追加済み
       const opt = document.createElement('div');
       opt.className = 'custom-select-option';
       opt.onclick = () => selectIconFilter(iconType, ICON_LABELS[iconType]);
       opt.innerHTML = '<img class="custom-select-icon" src="' + (iconPaths[iconType] || '') + '" /><span>' + ICON_LABELS[iconType] + '</span>';
       filterOpts.appendChild(opt);
     });
+  }
+  
+  // 初期状態でAll Iconsのアイコンを表示
+  const filterImg = document.getElementById('iconFilterSelectImage');
+  if (filterImg && iconPaths['all']) {
+    filterImg.src = iconPaths['all'];
+    filterImg.style.visibility = 'visible';
   }
 }
 
@@ -120,9 +156,10 @@ function selectIconFilter(iconType, label) {
   const options = document.getElementById('iconFilterSelectOptions');
   
   if (iconType === '') {
-    if (img) {
-      img.style.visibility = 'hidden';
-      img.src = '';
+    // All Iconsの場合もアイコンを表示
+    if (img && iconPaths['all']) {
+      img.src = iconPaths['all'];
+      img.style.visibility = 'visible';
     }
   } else {
     if (img && iconPaths[iconType]) {

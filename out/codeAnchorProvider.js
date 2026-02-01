@@ -210,6 +210,114 @@ class CodeAnchorProvider {
         });
         return Array.from(dirs).map(dir => vscode.Uri.file(dir));
     }
+    getMaterialIconName(filePath) {
+        const fileName = filePath.split('/').pop() || '';
+        const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() : '';
+        const lowerFileName = fileName.toLowerCase();
+        // 特殊なファイル名のマッピング
+        const specialFiles = {
+            'package.json': 'nodejs',
+            'package-lock.json': 'nodejs',
+            'tsconfig.json': 'tsconfig',
+            'webpack.config.js': 'webpack',
+            'dockerfile': 'docker',
+            'docker-compose.yml': 'docker',
+            'makefile': 'settings',
+            '.gitignore': 'git',
+            '.gitattributes': 'git',
+            'readme.md': 'markdown',
+            'readme': 'info',
+            'license': 'certificate',
+            '.env': 'tune',
+            '.env.local': 'tune',
+            '.eslintrc': 'eslint',
+            '.prettierrc': 'prettier',
+        };
+        for (const [key, icon] of Object.entries(specialFiles)) {
+            if (lowerFileName === key || lowerFileName.startsWith(key + '.')) {
+                return icon;
+            }
+        }
+        // 拡張子のマッピング
+        const extensionMap = {
+            // JavaScript/TypeScript
+            'js': 'javascript',
+            'jsx': 'react',
+            'ts': 'typescript',
+            'tsx': 'react_ts',
+            'mjs': 'javascript',
+            'cjs': 'javascript',
+            // C/C++
+            'c': 'c',
+            'h': 'h',
+            'cpp': 'cpp',
+            'cc': 'cpp',
+            'cxx': 'cpp',
+            'hpp': 'cpp',
+            'hxx': 'cpp',
+            // Python
+            'py': 'python',
+            'pyc': 'python',
+            'pyd': 'python',
+            'pyw': 'python',
+            // Java
+            'java': 'java',
+            'class': 'java',
+            'jar': 'java',
+            // Web
+            'html': 'html',
+            'htm': 'html',
+            'css': 'css',
+            'scss': 'sass',
+            'sass': 'sass',
+            'less': 'less',
+            // PHP
+            'php': 'php',
+            // Go
+            'go': 'go',
+            // Rust
+            'rs': 'rust',
+            // Ruby
+            'rb': 'ruby',
+            // Shell
+            'sh': 'shell',
+            'bash': 'shell',
+            'zsh': 'shell',
+            'fish': 'shell',
+            // Data/Config
+            'json': 'json',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'toml': 'toml',
+            'xml': 'xml',
+            'ini': 'settings',
+            'conf': 'settings',
+            'config': 'settings',
+            // Markdown/Docs
+            'md': 'markdown',
+            'txt': 'document',
+            // SQL
+            'sql': 'database',
+            // Other
+            'proto': 'proto',
+            'graphql': 'graphql',
+            'gql': 'graphql',
+            'vue': 'vue',
+            'svelte': 'svelte',
+            'swift': 'swift',
+            'kt': 'kotlin',
+            'scala': 'scala',
+            'r': 'r',
+            'dart': 'dart',
+            'lua': 'lua',
+            'perl': 'perl',
+            'pl': 'perl',
+        };
+        if (extension && extensionMap[extension]) {
+            return extensionMap[extension];
+        }
+        return 'file';
+    }
     sendIconPaths(webviewView) {
         const iconTypes = ['default', 'todo', 'bug', 'note', 'important', 'question', 'all'];
         const iconPaths = {};
@@ -603,7 +711,12 @@ class CodeAnchorProvider {
         const uri = vscode.Uri.file(fullPath);
         try {
             const document = await vscode.workspace.openTextDocument(uri);
-            await vscode.window.showTextDocument(document);
+            // 設定からプレビューモードを取得
+            const config = vscode.workspace.getConfiguration('code-anchor');
+            const openInPreview = config.get('ui.openInPreview', true);
+            await vscode.window.showTextDocument(document, {
+                preview: openInPreview
+            });
         }
         catch (error) {
             vscode.window.showErrorMessage(`Cannot open file: ${filePath}`);
@@ -640,7 +753,9 @@ class CodeAnchorProvider {
         }
         const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
         const line = editor.selection.active.line;
-        const iconTypeItems = Object.entries(types_1.ICON_TYPE_LABELS).map(([value, label]) => {
+        const iconTypeItems = Object.entries(types_1.ICON_TYPE_LABELS)
+            .filter(([value]) => value !== 'all') // 'all'アイコンは除外
+            .map(([value, label]) => {
             const iconPath = this.getIconPath(value);
             return {
                 label,
@@ -991,6 +1106,54 @@ class CodeAnchorProvider {
             const bookmarks = this.loadBookmarks();
             const favoritesMeta = this.loadFavoritesMeta();
             const bookmarksMeta = this.loadBookmarksMeta();
+            // ファイルアイコンのマッピングを生成
+            const fileIcons = {};
+            Object.keys(favorites).forEach(filePath => {
+                const iconName = this.getMaterialIconName(filePath);
+                const iconPath = path.join(this.context.extensionPath, 'resources', 'file-icons', `${iconName}.svg`);
+                try {
+                    if (fs.existsSync(iconPath)) {
+                        const iconUri = this._view.webview.asWebviewUri(vscode.Uri.file(iconPath));
+                        fileIcons[filePath] = iconUri.toString();
+                    }
+                    else {
+                        // フォールバック: デフォルトのfileアイコン
+                        const defaultIconPath = path.join(this.context.extensionPath, 'resources', 'file-icons', 'file.svg');
+                        if (fs.existsSync(defaultIconPath)) {
+                            const iconUri = this._view.webview.asWebviewUri(vscode.Uri.file(defaultIconPath));
+                            fileIcons[filePath] = iconUri.toString();
+                        }
+                    }
+                }
+                catch (error) {
+                    console.error(`Error loading icon for ${filePath}:`, error);
+                }
+            });
+            // Bookmarksのファイルアイコンも生成
+            Object.keys(bookmarks).forEach(filePath => {
+                // 既に生成済みの場合はスキップ
+                if (fileIcons[filePath])
+                    return;
+                const iconName = this.getMaterialIconName(filePath);
+                const iconPath = path.join(this.context.extensionPath, 'resources', 'file-icons', `${iconName}.svg`);
+                try {
+                    if (fs.existsSync(iconPath)) {
+                        const iconUri = this._view.webview.asWebviewUri(vscode.Uri.file(iconPath));
+                        fileIcons[filePath] = iconUri.toString();
+                    }
+                    else {
+                        // フォールバック: デフォルトのfileアイコン
+                        const defaultIconPath = path.join(this.context.extensionPath, 'resources', 'file-icons', 'file.svg');
+                        if (fs.existsSync(defaultIconPath)) {
+                            const iconUri = this._view.webview.asWebviewUri(vscode.Uri.file(defaultIconPath));
+                            fileIcons[filePath] = iconUri.toString();
+                        }
+                    }
+                }
+                catch (error) {
+                    console.error(`Error loading icon for ${filePath}:`, error);
+                }
+            });
             console.log('Sending update to webview - favorites:', favorites, 'bookmarks:', bookmarks);
             this._view.webview.postMessage({
                 command: 'update',
@@ -998,6 +1161,7 @@ class CodeAnchorProvider {
                 bookmarks: bookmarks,
                 favoritesMeta: favoritesMeta,
                 bookmarksMeta: bookmarksMeta,
+                fileIcons: fileIcons,
             });
         }
         else {

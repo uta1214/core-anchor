@@ -1,3 +1,37 @@
+/* CSS変数定義 - Modern */
+:root {
+  /* Font Sizes */
+  --font-size-section-title: 11px;
+  --font-size-folder-name: 12px;
+  --font-size-file-name: 11px;
+  --font-size-item-file: 11px;
+  --font-size-item-desc: 10px;
+  --font-size-item-line: 9px;
+  --font-size-folder-count: 10px;
+  --font-size-file-count: 10px;
+  --font-size-button: 11px;
+  --font-size-search: 11px;
+  --font-size-debug: 9px;
+  --font-size-mode-btn: 10px;
+  
+  /* Spacing */
+  --spacing-section-margin: 12px;
+  --spacing-item-padding: 5px;
+  --spacing-folder-indent: 0px;
+  
+  /* Border Radius - Modernはより丸い */
+  --border-radius-section: 6px;
+  --border-radius-button: 3px;
+  --border-radius-input: 3px;
+  
+  /* Icon Sizes */
+  --icon-size-small: 14px;
+  --icon-size-medium: 16px;
+}
+
+/* classicと同じスタイル定義をここにコピー */
+/* 以下、styles-classic.cssのbody以降をそのままコピーしてください */
+
 body { 
   padding: 10px; 
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -9,8 +43,8 @@ body {
 .section {
   background: var(--vscode-sideBar-background);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: var(--border-radius-section);
+  margin-bottom: var(--spacing-section-margin);
   overflow: hidden;
   transition: all 0.2s;
 }
@@ -27,10 +61,35 @@ body {
   justify-content: space-between;
   gap: 8px;
   min-height: 36px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.section-header:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.section-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.section-collapse-icon {
+  font-size: 10px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.section-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
 }
 
 .section-title {
-  font-size: 11px;
+  font-size: var(--font-size-section-title);
   font-weight: 600;
   color: var(--vscode-descriptionForeground);
   text-transform: uppercase;
@@ -42,25 +101,43 @@ body {
   min-width: 40px;
 }
 
+.section-content {
+  display: block;
+}
+
 .icon-filter { 
   display: flex; 
-  align-items: center; 
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .search-container { 
   padding: 6px;
 }
 
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 9px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .search-input { 
   width: 100%; 
-  padding: 7px 9px;
+  padding: 7px 9px 7px 28px;
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   border: 1px solid transparent;
   font-family: var(--vscode-font-family);
   box-sizing: border-box;
-  font-size: 12px;
-  border-radius: 3px;
+  font-size: var(--font-size-search);
+  border-radius: var(--border-radius-input);
   margin-bottom: 6px;
   transition: all 0.2s;
 }
@@ -78,7 +155,7 @@ body {
   display: flex; 
   gap: 3px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .mode-btn { 
@@ -87,16 +164,17 @@ body {
   border: none;
   padding: 3px;
   cursor: pointer;
-  font-size: 12px;
-  width: 24px;
+  font-size: var(--font-size-mode-btn);
+  min-width: 50px;
   height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
   flex-shrink: 0;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .mode-btn:hover { 
@@ -119,7 +197,7 @@ body {
   font-weight: bold;
   min-width: 24px;
   height: 24px;
-  border-radius: 3px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
   flex-shrink: 0;
 }
@@ -151,9 +229,9 @@ body {
   background: var(--vscode-button-secondaryBackground);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--vscode-button-secondaryForeground);
-  font-size: 11px;
+  font-size: var(--font-size-button);
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
   font-weight: 500;
   white-space: nowrap;
@@ -182,7 +260,7 @@ body {
   padding: 6px;
   background: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border);
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
 }
 
 .add-form.active { 
@@ -199,7 +277,7 @@ body {
   font-family: var(--vscode-font-family);
   box-sizing: border-box;
   font-size: 11px;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
 }
 
 .add-form button { 
@@ -209,8 +287,8 @@ body {
   padding: 6px 10px;
   cursor: pointer;
   width: 100%;
-  font-size: 10px;
-  border-radius: 3px;
+  font-size: var(--font-size-button);
+  border-radius: var(--border-radius-button);
   font-weight: 500;
 }
 
@@ -219,7 +297,7 @@ body {
 }
 
 .item { 
-  padding: 5px 8px;
+  padding: var(--spacing-item-padding) 8px;
   margin: 0;
   display: flex; 
   justify-content: space-between; 
@@ -245,7 +323,7 @@ body {
 }
 
 .item-file { 
-  font-size: 11px;
+  font-size: var(--font-size-item-file);
   color: var(--vscode-foreground);
   margin-bottom: 1px;
   font-weight: 400;
@@ -257,8 +335,13 @@ body {
   text-overflow: ellipsis;
 }
 
+.item-file svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 .item-desc { 
-  font-size: 10px;
+  font-size: var(--font-size-item-desc);
   color: var(--vscode-descriptionForeground);
   font-style: italic;
   margin-top: 1px;
@@ -268,7 +351,7 @@ body {
 }
 
 .item-line { 
-  font-size: 10px;
+  font-size: var(--font-size-item-line);
   color: var(--vscode-descriptionForeground);
   margin-top: 1px;
 }
@@ -290,11 +373,19 @@ body {
   border: none; 
   color: var(--vscode-foreground); 
   cursor: pointer; 
-  padding: 3px 5px;
+  padding: 4px 6px;
   opacity: 0.6; 
   font-size: 11px;
-  border-radius: 2px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.btn svg {
+  display: block;
 }
 
 .btn:hover { 
@@ -314,7 +405,7 @@ body {
   user-select: none; 
   background: var(--vscode-input-background);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
   font-size: 11px;
   gap: 6px;
@@ -339,7 +430,7 @@ body {
 }
 
 .folder-name { 
-  font-size: 12px;
+  font-size: var(--font-size-folder-name);
   font-weight: 500;
   color: var(--vscode-foreground);
   flex: 1;
@@ -347,6 +438,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.folder-name svg {
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .folder-count { 
@@ -354,13 +453,13 @@ body {
   color: var(--vscode-badge-foreground);
   padding: 1px 5px;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: var(--font-size-folder-count);
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .folder-items { 
-  padding-left: 0;
+  padding-left: var(--spacing-folder-indent);
   display: none;
   border-top: 1px solid var(--vscode-input-border);
   margin-top: 4px;
@@ -383,7 +482,7 @@ body {
   user-select: none; 
   background: var(--vscode-input-background);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  border-radius: var(--border-radius-button);
   transition: all 0.15s;
   gap: 6px;
 }
@@ -407,7 +506,7 @@ body {
 }
 
 .file-name { 
-  font-size: 12px;
+  font-size: var(--font-size-file-name);
   font-weight: 500;
   color: var(--vscode-foreground);
   flex: 1;
@@ -415,6 +514,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-name svg {
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 .file-count { 
@@ -422,13 +529,13 @@ body {
   color: var(--vscode-badge-foreground);
   padding: 1px 5px;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: var(--font-size-file-count);
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .file-items { 
-  padding-left: 0;
+  padding-left: var(--spacing-folder-indent);
   display: none;
   border-top: 1px solid var(--vscode-input-border);
   margin-top: 4px;
@@ -445,7 +552,7 @@ body {
   background: var(--vscode-input-background);
   border: 1px solid var(--vscode-input-border);
   margin-top: 3px;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
 }
 
 .edit-form.active { 
@@ -463,7 +570,7 @@ body {
   font-family: var(--vscode-font-family);
   box-sizing: border-box;
   font-size: 11px;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
 }
 
 .edit-form-buttons { 
@@ -477,8 +584,8 @@ body {
   padding: 6px 10px;
   cursor: pointer; 
   border: none; 
-  font-size: 10px;
-  border-radius: 3px;
+  font-size: var(--font-size-button);
+  border-radius: var(--border-radius-button);
   font-weight: 500;
 }
 
@@ -507,20 +614,20 @@ body {
 }
 
 .empty-text { 
-  font-size: 10px;
+  font-size: var(--font-size-button);
   color: var(--vscode-descriptionForeground);
   padding: 20px 12px;
   text-align: center;
 }
 
 .debug-info { 
-  font-size: 9px;
+  font-size: var(--font-size-debug);
   color: var(--vscode-descriptionForeground);
   padding: 3px 6px;
   background: var(--vscode-editor-background);
   margin: 0 6px 6px;
   font-family: 'Consolas', monospace;
-  border-radius: 2px;
+  border-radius: var(--border-radius-input);
 }
 
 .custom-select { 
@@ -540,7 +647,7 @@ body {
   align-items: center; 
   justify-content: space-between; 
   box-sizing: border-box;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
   font-size: 11px;
   transition: all 0.15s;
 }
@@ -556,8 +663,8 @@ body {
 }
 
 .custom-select-icon { 
-  width: 12px;
-  height: 12px;
+  width: var(--icon-size-medium);
+  height: var(--icon-size-medium);
   object-fit: contain;
   border-radius: 2px;
 }
@@ -577,7 +684,7 @@ body {
   max-height: 200px; 
   overflow-y: auto; 
   z-index: 1000;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
   margin-top: 2px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -608,7 +715,7 @@ body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3); 
   z-index: 10000; 
   min-width: 140px;
-  border-radius: 3px;
+  border-radius: var(--border-radius-input);
   overflow: hidden;
 }
 
@@ -619,7 +726,7 @@ body {
 .context-menu-item { 
   padding: 6px 10px;
   cursor: pointer; 
-  font-size: 11px;
+  font-size: var(--font-size-button);
   color: var(--vscode-menu-foreground);
   transition: background 0.15s;
 }
@@ -635,97 +742,35 @@ body {
   margin: 3px 0; 
 }
 
-/* レスポンシブ調整: 狭い幅での最適化 */
+/* レスポンシブ調整 */
 @container sidebar (max-width: 280px) {
-  .section-title {
-    font-size: 9px;
-    letter-spacing: 0.5px;
+  :root {
+    --font-size-section-title: 9px;
+    --font-size-folder-name: 10px;
+    --font-size-item-file: 9px;
+    --font-size-item-desc: 8px;
   }
   
-  .folder-name, .file-name {
-    font-size: 10px;
-  }
-  
-  .folder-count, .file-count {
-    font-size: 8px;
-    padding: 1px 4px;
-  }
-  
-  .item-file {
-    font-size: 9px;
-  }
-  
-  .item-desc {
-    font-size: 8px;
-  }
-  
-  .toggle-add-btn {
-    font-size: 9px;
-    padding: 5px;
-  }
-  
-  .search-input {
-    font-size: 10px;
-    padding: 5px 7px;
-  }
-  
-  .debug-info {
-    font-size: 8px;
+  .mode-btn {
+    min-width: 42px;
+    padding: 3px 6px;
   }
 }
 
 @container sidebar (max-width: 220px) {
-  .section-title {
-    font-size: 8px;
-  }
-  
   .folder-count, .file-count {
     display: none;
   }
-  
   .item-desc {
     display: none;
   }
-  
   .debug-info {
     display: none;
   }
   
-  .folder-name, .file-name {
-    font-size: 9px;
-  }
-  
-  .item-file {
+  .mode-btn {
     font-size: 8px;
-  }
-  
-  .toggle-add-btn {
-    font-size: 8px;
-    padding: 4px;
-  }
-}
-
-@container sidebar (max-width: 180px) {
-  .mode-btn, .depth-btn {
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
-  }
-  
-  .depth-display {
-    font-size: 9px;
-    min-width: 14px;
-  }
-  
-  .section-header {
-    padding: 8px 10px 6px;
-  }
-  
-  .folder-header, .file-header {
-    padding: 5px 7px;
-  }
-  
-  .item {
-    padding: 4px 7px;
+    min-width: 36px;
+    padding: 3px 4px;
   }
 }

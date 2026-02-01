@@ -7,8 +7,7 @@ let iconPaths = {};
 let currentFavoriteMode = 'global';
 let favoritesMeta = { folderOrder: [], fileOrder: {} };
 let bookmarksMeta = { fileOrder: [], bookmarkSortType: {} };
-let showFavorites = true;
-let showBookmarks = true;
+let sectionCollapsed = { favorites: false, bookmarks: false }; // セクション折りたたみ状態
 const ICON_LABELS = {
   'default': 'Default',
   'todo': 'TODO',
@@ -31,15 +30,16 @@ function loadState() {
     } else {
       currentFolderDepth = 1;
     }
-    if (state.showFavorites !== undefined) showFavorites = state.showFavorites;
-    if (state.showBookmarks !== undefined) showBookmarks = state.showBookmarks;
+    if (state.sectionCollapsed) {
+      sectionCollapsed = state.sectionCollapsed;
+    }
   } else {
     currentFolderDepth = 1;
   }
   updateModeButtons();
   updateFolderDepthDisplay();
-  updateSectionVisibility();
-  console.log('State loaded, folderDepth:', currentFolderDepth, 'showFavorites:', showFavorites, 'showBookmarks:', showBookmarks);
+  updateSectionCollapseStates();
+  
 }
 
 function saveState() {
@@ -49,31 +49,34 @@ function saveState() {
     iconPaths: iconPaths,
     favoriteMode: currentFavoriteMode,
     folderDepth: currentFolderDepth,
-    showFavorites: showFavorites,
-    showBookmarks: showBookmarks
+    sectionCollapsed: sectionCollapsed
   });
 }
 
-function updateSectionVisibility() {
-  const sections = document.querySelectorAll('.section');
-  const separator = document.querySelector('.separator');
+function toggleSection(sectionName) {
+  sectionCollapsed[sectionName] = !sectionCollapsed[sectionName];
+  updateSectionCollapseState(sectionName);
+  saveState();
+}
+
+function updateSectionCollapseState(sectionName) {
+  const content = document.getElementById(sectionName + 'Content');
+  const icon = document.getElementById(sectionName + 'CollapseIcon');
   
-  if (sections.length >= 2) {
-    // 最初のsectionがFavorites、2番目がBookmarks
-    const favoritesSection = sections[0];
-    const bookmarksSection = sections[1];
-    
-    if (favoritesSection) {
-      favoritesSection.style.display = showFavorites ? 'block' : 'none';
-    }
-    if (bookmarksSection) {
-      bookmarksSection.style.display = showBookmarks ? 'block' : 'none';
+  if (content && icon) {
+    if (sectionCollapsed[sectionName]) {
+      content.style.display = 'none';
+      icon.textContent = '▶';
+    } else {
+      content.style.display = 'block';
+      icon.textContent = '▼';
     }
   }
-  
-  if (separator) {
-    separator.style.display = (showFavorites && showBookmarks) ? 'block' : 'none';
-  }
+}
+
+function updateSectionCollapseStates() {
+  updateSectionCollapseState('favorites');
+  updateSectionCollapseState('bookmarks');
 }
 
 window.addEventListener('load', () => { 
@@ -83,14 +86,18 @@ window.addEventListener('load', () => {
 
 window.addEventListener('message', event => {
   const msg = event.data;
-  console.log('Received message:', msg.command, msg);
+  
   
   if (msg.command === 'update') {
     favoritesMeta = msg.favoritesMeta || { folderOrder: [], fileOrder: {} };
     bookmarksMeta = msg.bookmarksMeta || { fileOrder: [], bookmarkSortType: {} };
     allFavoritesData = msg.favorites;
     allBookmarksData = msg.bookmarks;
-    console.log('Update received, folderDepth:', currentFolderDepth, 'favorites:', msg.favorites);
+    // ファイルアイコンのマッピングを更新
+    if (msg.fileIcons) {
+      fileIcons = msg.fileIcons;
+    }
+    
     updateFavorites(msg.favorites);
     updateBookmarks(msg.bookmarks);
   } else if (msg.command === 'setIconPaths') {
@@ -102,19 +109,16 @@ window.addEventListener('message', event => {
     updateModeButtons();
     saveState();
   } else if (msg.command === 'setFolderDepth') {
-    console.log('setFolderDepth received:', msg.depth);
+    
     currentFolderDepth = msg.depth;
     updateFolderDepthDisplay();
     saveState();
     if (allFavoritesData) {
-      console.log('Re-rendering favorites with depth:', currentFolderDepth);
+      
       updateFavorites(allFavoritesData);
     }
-  } else if (msg.command === 'setSectionVisibility') {
-    console.log('setSectionVisibility received:', msg);
-    if (msg.showFavorites !== undefined) showFavorites = msg.showFavorites;
-    if (msg.showBookmarks !== undefined) showBookmarks = msg.showBookmarks;
-    updateSectionVisibility();
-    saveState();
   }
 });
+
+// グローバルに公開
+window.toggleSection = toggleSection;

@@ -3,11 +3,17 @@
 let editingFavorite = null;
 let allFavoritesData = null;
 let currentFolderDepth = 1;
+let fileIcons = {}; // ファイルアイコンのマッピング
+
+// 共通SVGアイコン
+const EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 2L14 5L5 14H2V11L11 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.5 3.5L12.5 6.5" stroke="currentColor" stroke-width="1.5"/></svg>';
+const DELETE_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+const FOLDER_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1.5 3H6.5L8 5H14.5V13H1.5V3Z" stroke="currentColor" stroke-width="1.5"/></svg>';
 
 function increaseFolderDepth() {
-  console.log('increaseFolderDepth called, current:', currentFolderDepth);
+  
   currentFolderDepth++;
-  console.log('new depth:', currentFolderDepth);
+  
   updateFolderDepthDisplay();
   saveState();
   vscode.postMessage({ command: 'setFolderDepth', depth: currentFolderDepth });
@@ -17,10 +23,10 @@ function increaseFolderDepth() {
 }
 
 function decreaseFolderDepth() {
-  console.log('decreaseFolderDepth called, current:', currentFolderDepth);
+  
   if (currentFolderDepth > 0) {
     currentFolderDepth--;
-    console.log('new depth:', currentFolderDepth);
+    
     updateFolderDepthDisplay();
     saveState();
     vscode.postMessage({ command: 'setFolderDepth', depth: currentFolderDepth });
@@ -154,12 +160,10 @@ function updateFavorites(favorites) {
     return;
   }
   
-  // ツリー構造を構築
   const tree = buildFolderTree(entries, currentFolderDepth);
   
   container.innerHTML = '';
   
-  // Root Filesフォルダでラップ
   const folderId = safeId('__workspace_root__');
   const isExpanded = expandedFolders.has(folderId);
   
@@ -171,7 +175,7 @@ function updateFavorites(favorites) {
   headerDiv.onclick = () => toggleFolder(folderId);
   
   const totalFiles = countAllFilesInTree(tree);
-  headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">📁 Workspace Files</span><span class="folder-count">(' + totalFiles + ')</span>';
+  headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">' + FOLDER_ICON + '<span style="margin-left: 4px;">Workspace Files</span></span><span class="folder-count">(' + totalFiles + ')</span>';
   
   const itemsDiv = document.createElement('div');
   itemsDiv.id = 'items-' + folderId;
@@ -196,17 +200,14 @@ function buildFolderTree(entries, depth) {
     const folderParts = parts.slice(0, -1);
     
     if (depth === 0 || folderParts.length === 0) {
-      // 深度0またはルートファイル
       if (!tree['__root__']) {
         tree['__root__'] = { type: 'files', files: [] };
       }
       tree['__root__'].files.push({ fullPath: path, fileName, data });
     } else {
-      // 下からdepth個のフォルダを取得
       const startIndex = Math.max(0, folderParts.length - depth);
       const relevantParts = folderParts.slice(startIndex);
       
-      // ツリーを構築
       let currentLevel = tree;
       relevantParts.forEach((folderName, index) => {
         if (!currentLevel[folderName]) {
@@ -216,15 +217,12 @@ function buildFolderTree(entries, depth) {
             files: []
           };
         }
-        // 次のレベルに移動
         if (index < relevantParts.length - 1) {
           currentLevel = currentLevel[folderName].children;
         }
       });
       
-      // ファイルを最終フォルダに追加
       const lastFolder = relevantParts[relevantParts.length - 1];
-      // 最終フォルダの位置を再度取得
       let targetLevel = tree;
       for (let i = 0; i < relevantParts.length - 1; i++) {
         targetLevel = targetLevel[relevantParts[i]].children;
@@ -241,7 +239,6 @@ function renderFolderTree(node, container, parentPath, level) {
   
   keys.forEach(key => {
     if (key === '__root__') {
-      // ルートファイルを表示
       const rootFiles = node[key].files;
       if (rootFiles.length > 0) {
         rootFiles.forEach(({ fullPath, fileName, data }) => {
@@ -267,10 +264,9 @@ function renderFolderTree(node, container, parentPath, level) {
       headerDiv.className = 'folder-header';
       headerDiv.onclick = () => toggleFolder(folderId);
       
-      // ファイル数をカウント(子フォルダ含む)
       const fileCount = countFilesInTree(item);
       
-      headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">📁 ' + escapeHtml(key) + '</span><span class="folder-count">(' + fileCount + ')</span>';
+      headerDiv.innerHTML = '<span id="icon-' + folderId + '" class="folder-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="folder-name">' + FOLDER_ICON + '<span style="margin-left: 4px;">' + escapeHtml(key) + '</span></span><span class="folder-count">(' + fileCount + ')</span>';
       
       const itemsDiv = document.createElement('div');
       itemsDiv.id = 'items-' + folderId;
@@ -282,14 +278,12 @@ function renderFolderTree(node, container, parentPath, level) {
       container.appendChild(folderDiv);
       
       if (isExpanded) {
-        // このフォルダのファイルを表示
         item.files.forEach(({ fullPath, fileName, data }) => {
           const wrapper = createFileItemElement(fullPath, fileName, data);
           wrapper.style.marginLeft = '0px';
           itemsDiv.appendChild(wrapper);
         });
         
-        // 子フォルダを再帰的にレンダリング
         renderFolderTree(item.children, itemsDiv, currentPath, level + 1);
       }
     }
@@ -324,16 +318,20 @@ function createFileItemElement(fullPath, fileName, data) {
   const descEsc = escapeHtml(data.description || '');
   const safeFullPath = fullPath.replace(/'/g, "\\'").replace(/\\\\/g, "\\\\");
   
+  // ファイルアイコンを取得（TypeScriptから送られたマッピングを使用）
+  const iconSrc = fileIcons[fullPath] || '';
+  const fileIconHtml = iconSrc ? '<img src="' + iconSrc + '" style="width:14px;height:14px;vertical-align:middle;" />' : '';
+  
   const wrapper = document.createElement('div');
   
   const itemDiv = document.createElement('div');
   itemDiv.className = 'item';
-  itemDiv.innerHTML = '<div class="item-content" onclick="openFile(\'' + safeFullPath + '\')"><div class="item-file">' + escapeHtml(fileName) + '</div><div class="item-desc">' + descEsc + '</div></div><div class="item-buttons"><button class="btn" onclick="startEditFavorite(\'' + safeFullPath + '\')">✏️</button><button class="btn" onclick="removeFavorite(\'' + safeFullPath + '\')">×</button></div>';
+  itemDiv.innerHTML = '<div class="item-content" onclick="openFile(\'' + safeFullPath + '\')"><div class="item-file">' + fileIconHtml + '<span style="margin-left: 4px;">' + escapeHtml(fileName) + '</span></div><div class="item-desc">' + descEsc + '</div></div><div class="item-buttons"><button class="btn" onclick="startEditFavorite(\'' + safeFullPath + '\'); event.stopPropagation();">' + EDIT_ICON + '</button><button class="btn" onclick="removeFavorite(\'' + safeFullPath + '\'); event.stopPropagation();">' + DELETE_ICON + '</button></div>';
   
   const editForm = document.createElement('div');
   editForm.id = 'edit-fav-' + pathId;
   editForm.className = 'edit-form';
-  editForm.innerHTML = '<input type="text" class="edit-path" value="' + pathEsc + '" /><input type="text" class="edit-desc" value="' + descEsc + '" /><div class="edit-form-buttons"><button class="save-btn" onclick="saveEditFavorite(\'' + safeFullPath + '\')">Save</button><button class="cancel-btn" onclick="cancelEditFavorite(\'' + safeFullPath + '\')">Cancel</button></div>';
+  editForm.innerHTML = '<input type="text" class="edit-path" placeholder="File path" value="' + pathEsc + '" /><input type="text" class="edit-desc" placeholder="Description" value="' + descEsc + '" /><div class="edit-form-buttons"><button class="save-btn" onclick="saveEditFavorite(\'' + safeFullPath + '\')">Save</button><button class="cancel-btn" onclick="cancelEditFavorite(\'' + safeFullPath + '\')">Cancel</button></div>';
   
   wrapper.appendChild(itemDiv);
   wrapper.appendChild(editForm);

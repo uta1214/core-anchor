@@ -168,7 +168,12 @@ function updateBookmarks(bookmarks) {
       { separator: true },
       { label: 'Delete All Bookmarks', action: () => vscode.postMessage({ command: 'deleteAllBookmarks', filePath }) },
     ]);
-    headerDiv.innerHTML = '<span id="fileicon-' + fileId + '" class="file-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="file-name">📄 ' + escapeHtml(filePath) + '</span><span class="file-count">(' + marks.length + ')</span>';
+    
+    // ファイルアイコンを取得
+    const fileIconSrc = fileIcons[filePath] || '';
+    const fileIconHtml = fileIconSrc ? '<img src="' + fileIconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" />' : '📄 ';
+    
+    headerDiv.innerHTML = '<span id="fileicon-' + fileId + '" class="file-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="file-name">' + fileIconHtml + escapeHtml(filePath) + '</span><span class="file-count">(' + marks.length + ')</span>';
     
     const itemsDiv = document.createElement('div');
     itemsDiv.id = 'fileitems-' + fileId;
@@ -185,13 +190,16 @@ function updateBookmarks(bookmarks) {
       const safeFilePath = filePath.replace(/'/g, "\\'").replace(/\\\\/g, "\\\\");
       const itemDiv = document.createElement('div');
       itemDiv.className = 'item';
-      itemDiv.innerHTML = '<div class="item-content" onclick="jumpToBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><div class="item-desc"><img src="' + iconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" /> ' + labelEsc + '</div><div class="item-line">Line ' + (mark.line + 1) + '</div></div><div class="item-buttons"><button class="btn" onclick="startEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">✏️</button><button class="btn" onclick="removeBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">×</button></div>';
+      itemDiv.innerHTML = '<div class="item-content" onclick="jumpToBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><div class="item-desc"><img src="' + iconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" /> ' + labelEsc + '</div><div class="item-line">Line ' + (mark.line + 1) + '</div></div><div class="item-buttons"><button class="btn" onclick="event.stopPropagation(); startEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1.5L14.5 4.5L5 14H2V11L11.5 1.5Z" stroke="currentColor" stroke-width="1.5"/></svg></button><button class="btn" onclick="event.stopPropagation(); removeBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.5"/></svg></button></div>';
       const editForm = document.createElement('div');
       editForm.id = 'edit-bm-' + bmId;
       editForm.className = 'edit-form';
-      editForm.innerHTML = '<input type="text" class="edit-line" value="' + (mark.line + 1) + '" /><input type="text" class="edit-label" value="' + labelEsc + '" /><div class="custom-select" id="' + selectId + '"><div class="custom-select-trigger" onclick="toggleIconSelect(\'' + selectId + '\')"><div class="custom-select-value"><img class="custom-select-icon" id="' + selectId + 'Image" src="' + iconSrc + '" /><span id="' + selectId + 'Text">' + iconLabel + '</span></div><span class="custom-select-arrow">▼</span></div><div class="custom-select-options" id="' + selectId + 'Options"></div></div><div class="edit-form-buttons"><button class="save-btn" onclick="saveEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Save</button><button class="cancel-btn" onclick="cancelEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Cancel</button></div>';
+      editForm.innerHTML = '<input type="text" class="edit-line" placeholder="Line number" value="' + (mark.line + 1) + '" /><input type="text" class="edit-label" placeholder="Label" value="' + labelEsc + '" /><div class="custom-select" id="' + selectId + '"><div class="custom-select-trigger" onclick="toggleIconSelect(\'' + selectId + '\')"><div class="custom-select-value"><img class="custom-select-icon" id="' + selectId + 'Image" src="' + iconSrc + '" /><span id="' + selectId + 'Text">' + iconLabel + '</span></div><span class="custom-select-arrow">∨</span></div><div class="custom-select-options" id="' + selectId + 'Options"></div></div><div class="edit-form-buttons"><button class="save-btn" onclick="saveEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Save</button><button class="cancel-btn" onclick="cancelEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Cancel</button></div>';
       const opts = editForm.querySelector('.custom-select-options');
       Object.keys(ICON_LABELS).forEach(type => {
+        // 'all'アイコンは編集時のセレクトに表示しない
+        if (type === 'all') return;
+        
         const opt = document.createElement('div');
         opt.className = 'custom-select-option';
         opt.onclick = () => selectIcon(selectId, type, ICON_LABELS[type]);

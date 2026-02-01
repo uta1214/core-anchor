@@ -1,17 +1,17 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { CodeAnchorProvider } from './codeAnchorProvider';
+import { CoreAnchorProvider } from './coreAnchorProvider';
 import { BookmarkIconType, BookmarksData } from './types';
 
 const decorationTypes: Map<BookmarkIconType, vscode.TextEditorDecorationType> = new Map();
 
 // カスタムアイコンパスを取得する関数
 function getIconPath(context: vscode.ExtensionContext, iconType: BookmarkIconType): string {
-  const config = vscode.workspace.getConfiguration('code-anchor');
+  const config = vscode.workspace.getConfiguration('core-anchor');
   let customPath = config.get<string>(`icons.${iconType}`);
   
-  console.log(`Getting icon path for ${iconType}:`, customPath);
+  
   
   if (customPath && customPath.trim() !== '') {
     customPath = customPath.trim().replace(/^["']|["']$/g, '');
@@ -25,24 +25,24 @@ function getIconPath(context: vscode.ExtensionContext, iconType: BookmarkIconTyp
       }
     }
     
-    console.log(`Resolved absolute path for ${iconType}:`, absolutePath);
+    
     
     if (fs.existsSync(absolutePath)) {
-      console.log(`Custom icon found for ${iconType}:`, absolutePath);
+      
       return absolutePath;
     } else {
-      console.log(`Custom icon not found for ${iconType} at path: ${absolutePath}, falling back to default`);
+      
     }
   }
   
   const defaultPath = context.asAbsolutePath(path.join('resources', `bookmark-${iconType}.png`));
-  console.log(`Using default icon for ${iconType}:`, defaultPath);
+  
   return defaultPath;
 }
 
 // デコレーションタイプを更新する関数
-function updateDecorationTypes(context: vscode.ExtensionContext, provider: CodeAnchorProvider) {
-  console.log('Updating decoration types...');
+function updateDecorationTypes(context: vscode.ExtensionContext, provider: CoreAnchorProvider) {
+  
   
   decorationTypes.forEach(decoration => decoration.dispose());
   decorationTypes.clear();
@@ -56,7 +56,7 @@ function updateDecorationTypes(context: vscode.ExtensionContext, provider: CodeA
       gutterIconSize: 'contain',
     });
     decorationTypes.set(iconType, decorationType);
-    console.log(`Created decoration for ${iconType} with icon:`, iconPath);
+    
   });
   
   provider.setDecorationTypes(decorationTypes);
@@ -65,7 +65,7 @@ function updateDecorationTypes(context: vscode.ExtensionContext, provider: CodeA
     provider.updateDecorations(vscode.window.activeTextEditor);
   }
   
-  console.log('Decoration types updated successfully');
+  
 }
 
 // ブックマークファイルのパスを取得
@@ -106,47 +106,47 @@ function saveBookmarks(bookmarks: BookmarksData) {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Code Anchor extension is activating...');
   
-  const provider = new CodeAnchorProvider(context);
+  
+  const provider = new CoreAnchorProvider(context);
 
   updateDecorationTypes(context, provider);
 
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('code-anchor.mainView', provider)
+    vscode.window.registerWebviewViewProvider('core-anchor.mainView', provider)
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('code-anchor.refresh', () => {
-      console.log('Refresh command executed');
+    vscode.commands.registerCommand('core-anchor.refresh', () => {
+      
       provider.refresh();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('code-anchor.addBookmark', async () => {
-      console.log('Add bookmark command executed');
+    vscode.commands.registerCommand('core-anchor.addBookmark', async () => {
+      
       await provider.addBookmarkFromCommand();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('code-anchor.addFavorite', async () => {
-      console.log('Add favorite command executed');
+    vscode.commands.registerCommand('core-anchor.addFavorite', async () => {
+      
       await provider.addFavoriteFromCommand();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('code-anchor.moveBookmarkUp', async () => {
-      console.log('Move bookmark up command executed');
+    vscode.commands.registerCommand('core-anchor.moveBookmarkUp', async () => {
+      
       await provider.moveBookmarkUp();
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('code-anchor.moveBookmarkDown', async () => {
-      console.log('Move bookmark down command executed');
+    vscode.commands.registerCommand('core-anchor.moveBookmarkDown', async () => {
+      
       await provider.moveBookmarkDown();
     })
   );
@@ -154,7 +154,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {
-        console.log('Active editor changed:', editor.document.fileName);
+        
         provider.updateDecorations(editor);
       }
     })
@@ -256,18 +256,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('code-anchor.icons')) {
-        console.log('Icon configuration changed, updating decorations...');
+      if (e.affectsConfiguration('core-anchor.icons')) {
+        
         updateDecorationTypes(context, provider);
         provider.refresh();
       }
-      if (e.affectsConfiguration('code-anchor.ui.theme')) {
-        console.log('Theme configuration changed, reloading webview...');
+      if (e.affectsConfiguration('core-anchor.ui.theme')) {
+        
         provider.reloadWebview();
       }
-      if (e.affectsConfiguration('code-anchor.ui.showFavorites') || 
-          e.affectsConfiguration('code-anchor.ui.showBookmarks')) {
-        console.log('Section visibility changed, updating...');
+      if (e.affectsConfiguration('core-anchor.ui.showFavorites') || 
+          e.affectsConfiguration('core-anchor.ui.showBookmarks')) {
+        
         provider.reloadWebview();
       }
     })
@@ -277,11 +277,11 @@ export function activate(context: vscode.ExtensionContext) {
     provider.updateDecorations(vscode.window.activeTextEditor);
   }
   
-  console.log('Code Anchor extension activated successfully');
+  
 }
 
 export function deactivate() {
-  console.log('Code Anchor extension is deactivating...');
+  
   decorationTypes.forEach(decoration => decoration.dispose());
   decorationTypes.clear();
 }
