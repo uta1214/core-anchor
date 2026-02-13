@@ -29,12 +29,21 @@
   --icon-size-medium: 16px;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body { 
   padding: 10px; 
   font-family: var(--vscode-font-family); 
   color: var(--vscode-foreground);
   container-type: inline-size;
   container-name: sidebar;
+  overflow-x: hidden;
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+  scrollbar-gutter: stable;
 }
 
 .section { 
@@ -278,11 +287,17 @@ body {
   margin-bottom: 2px;
   display: flex;
   align-items: center;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .item-desc { 
   font-size: var(--font-size-item-desc); 
-  color: var(--vscode-descriptionForeground); 
+  color: var(--vscode-descriptionForeground);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .item-line { 
@@ -332,6 +347,8 @@ body {
   user-select: none; 
   background: var(--vscode-sideBar-background);
   border-radius: var(--border-radius-button);
+  min-width: 0;
+  gap: 4px;
 }
 
 .folder-header:hover { 
@@ -339,10 +356,11 @@ body {
 }
 
 .folder-icon { 
-  margin-right: 6px; 
+  margin-right: 2px; 
   font-size: 12px; 
   transition: transform 0.2s; 
-  display: inline-block; 
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .folder-icon.expanded { 
@@ -355,12 +373,24 @@ body {
   color: var(--vscode-foreground);
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .folder-count { 
   margin-left: 6px; 
   font-size: var(--font-size-folder-count); 
   color: var(--vscode-descriptionForeground); 
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+  display: inline-block;
 }
 
 .folder-items { 
@@ -412,6 +442,13 @@ body {
   margin-left: 6px; 
   font-size: var(--font-size-file-count); 
   color: var(--vscode-descriptionForeground); 
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 16px;
+  text-align: center;
+  display: inline-block;
 }
 
 .file-items { 
@@ -627,4 +664,75 @@ body {
   .debug-info {
     display: none;
   }
+}
+/* ホバーボタン・選択状態のスタイル（追加機能） */
+.folder-header.selected,
+.item.selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  border-left: 3px solid var(--vscode-focusBorder);
+}
+
+.folder-header.selected .folder-name,
+.item.selected .item-file {
+  font-weight: 600;
+}
+
+.folder-header:focus,
+.item:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.folder-name,
+.item-file {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.folder-header,
+.item {
+  transition: background 0.1s ease, border-left 0.1s ease;
+}
+
+/* ホバー時のボタン表示 */
+.item-buttons {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.item:hover .item-buttons {
+  opacity: 1;
+}
+
+.folder-buttons {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.folder-header:hover .folder-buttons {
+  opacity: 1;
+}
+
+.item-buttons .btn:hover,
+.folder-buttons .btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  transform: scale(1.1);
+}
+
+/* ブックマーク行プレビュー（ツールチップ風） */
+.bookmark-preview {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  padding-left: 20px;
+  font-family: var(--vscode-editor-font-family);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+  opacity: 0.7;
+  font-style: italic;
 }

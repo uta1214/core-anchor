@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { FavoriteFile, Bookmark, BookmarksData, BookmarkIconType, ICON_TYPE_LABELS, FavoriteMode, SortType, FavoritesMeta, BookmarksMeta } from './types';
+import { FavoriteFile, Bookmark, BookmarksData, BookmarkIconType, ICON_TYPE_LABELS, FavoriteMode, SortType, FavoritesMeta, BookmarksMeta, VirtualFolder } from './types';
 import { getHtmlContent } from './webview/index';
 
 export class CoreAnchorProvider implements vscode.WebviewViewProvider {
@@ -22,7 +22,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
 
   reloadWebview() {
     if (this._view) {
-      //console.log('Reloading webview...');
       try {
         this._view.webview.html = this.getHtmlContent();
         this.sendIconPaths(this._view);
@@ -44,7 +43,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         });
         
         this.refresh();
-        //console.log('Webview reloaded successfully');
       } catch (error) {
         console.error('Error reloading webview:', error);
       }
@@ -52,7 +50,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView) {
-    //console.log('Resolving webview view...');
     this._view = webviewView;
 
     const customIconDirs = this.getCustomIconDirectories();
@@ -68,7 +65,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
 
     try {
       webviewView.webview.html = this.getHtmlContent();
-      //console.log('Webview HTML set successfully');
     } catch (error) {
       console.error('Error setting webview HTML:', error);
     }
@@ -76,13 +72,44 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.sendIconPaths(webviewView);
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
-      //console.log('Received message from webview:', message.command);
       switch (message.command) {
         case 'addFavorite':
-          await this.addFavorite(message.path, message.description);
+          await this.addFavorite(message.path, message.description, message.isRelative, message.virtualFolderId);
           break;
         case 'quickAddCurrentFile':
           await this.quickAddCurrentFile();
+          break;
+        case 'addFileWithContext':
+          await this.addFileWithContext();
+          break;
+        case 'createVirtualFolder':
+          await this.createVirtualFolder(message.name, message.parentId);
+          break;
+        case 'createSubfolder':
+          await this.createSubfolderWithUI(message.parentId, message.parentName);
+          break;
+        case 'renameVirtualFolder':
+          if (message.newName) {
+            await this.renameVirtualFolder(message.id, message.newName);
+          } else {
+            await this.renameVirtualFolderWithUI(message.id, message.currentName);
+          }
+          break;
+        case 'deleteVirtualFolder':
+          await this.deleteVirtualFolderWithConfirm(message.id, message.folderName);
+          break;
+        case 'changeFolderColor':
+          if (message.color) {
+            await this.changeFolderColor(message.id, message.color);
+          } else {
+            await this.changeFolderColorWithUI(message.id);
+          }
+          break;
+        case 'moveFileToFolder':
+          await this.moveFileToFolder(message.filePath, message.targetFolderId);
+          break;
+        case 'moveFolderToFolder':
+          await this.moveFolderToFolder(message.folderId, message.targetParentId);
           break;
         case 'editFavorite':
           await this.editFavorite(message.oldPath, message.newPath, message.description);
@@ -91,7 +118,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           await this.removeFavorite(message.path);
           break;
         case 'openFile':
-          await this.openFile(message.path);
+          await this.openFile(message.path, message.openToSide);
           break;
         case 'addBookmarkManual':
           await this.addBookmarkManual(message.filePath, message.line, message.label, message.iconType);
@@ -103,7 +130,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           await this.removeBookmark(message.filePath, message.line);
           break;
         case 'jumpToBookmark':
-          await this.jumpToBookmark(message.filePath, message.line);
+          await this.jumpToBookmark(message.filePath, message.line, message.openToSide);
           break;
         case 'switchFavoriteMode':
           await this.switchFavoriteMode(message.mode);
@@ -139,7 +166,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           this.refresh();
           break;
         case 'ready':
-          //console.log('Webview ready, sending initial data');
           this.sendIconPaths(webviewView);
           this.sendFavoriteMode();
           const folderDepth = this.context.workspaceState.get('folderDepth', 1);
@@ -328,7 +354,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       try {
         const webviewUri = webviewView.webview.asWebviewUri(vscode.Uri.file(iconPath));
         iconPaths[iconType] = webviewUri.toString();
-        //console.log(`Icon path for ${iconType}: ${iconPath} -> ${iconPaths[iconType]}`);
       } catch (error) {
         console.error(`Error converting icon path for ${iconType}:`, error);
         const defaultPath = this.context.asAbsolutePath(path.join('resources', `bookmark-${iconType}.png`));
@@ -336,8 +361,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         iconPaths[iconType] = webviewUri.toString();
       }
     });
-    
-    //console.log('Sending icon paths to webview:', iconPaths);
     
     webviewView.webview.postMessage({
       command: 'setIconPaths',
@@ -363,7 +386,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       fs.mkdirSync(configDir, { recursive: true });
     }
     
-    return path.join(configDir, 'core-anchor-favorites.json');
+    return path.join(configDir, 'code-anchor-favorites.json');
   }
 
   // Local Favoritesのパスを取得
@@ -387,7 +410,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
       }
-      return path.join(configDir, 'core-anchor-favorites-meta.json');
+      return path.join(configDir, 'code-anchor-favorites-meta.json');
     } else {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) return '';
@@ -450,15 +473,20 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const metaPath = this.getFavoritesMetaPath();
     
     if (!metaPath || !fs.existsSync(metaPath)) {
-      return { folderOrder: [], fileOrder: {} };
+      return { folderOrder: [], fileOrder: {}, virtualFolders: [] };
     }
 
     try {
       const content = fs.readFileSync(metaPath, 'utf-8');
-      return JSON.parse(content);
+      const meta = JSON.parse(content);
+      // 既存のデータにvirtualFoldersがない場合は追加
+      if (!meta.virtualFolders) {
+        meta.virtualFolders = [];
+      }
+      return meta;
     } catch (error) {
       console.error('Error loading favorites meta:', error);
-      return { folderOrder: [], fileOrder: {} };
+      return { folderOrder: [], fileOrder: {}, virtualFolders: [] };
     }
   }
 
@@ -688,7 +716,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.refresh();
   }
 
-  private async addFavorite(filePath: string, description: string) {
+  private async addFavorite(filePath: string, description: string, isRelative: boolean = true, virtualFolderId: string | null = null) {
     if (!filePath.trim()) {
       vscode.window.showErrorMessage('File path is required');
       return;
@@ -698,7 +726,9 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     favorites[filePath] = { 
       path: filePath, 
       description,
-      order: this.nextFavoriteOrder++
+      order: this.nextFavoriteOrder++,
+      isRelative: isRelative,
+      virtualFolderId: virtualFolderId
     };
     this.saveFavorites(favorites);
 
@@ -706,7 +736,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     vscode.window.showInformationMessage(`Added "${filePath}" to favorites`);
   }
 
-  // Quick Add: 現在のファイルを説明なしで追加
+  // Quick Add: 現在のファイルをフォルダ選択して追加
   private async quickAddCurrentFile() {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -729,13 +759,128 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    await this.addFavorite(relativePath, '');
+    // フォルダ選択QuickPick
+    const meta = this.loadFavoritesMeta();
+    const virtualFolders = meta.virtualFolders || [];
+    
+    const folderItems: vscode.QuickPickItem[] = [
+      {
+        label: '$(inbox) Uncategorized',
+        description: ''
+      }
+    ];
+    
+    folderItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+    
+    folderItems.push({
+      label: '$(add) Create New Folder',
+      description: ''
+    });
+    
+    if (virtualFolders.length > 0) {
+      folderItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+      
+      virtualFolders.forEach(folder => {
+        folderItems.push({
+          label: `$(folder) ${folder.name}`,
+          description: ''
+        });
+      });
+    }
+    
+    const selectedFolder = await vscode.window.showQuickPick(folderItems, {
+      placeHolder: 'Select a folder (or press Escape to cancel)',
+      title: 'Quick Add to Favorites'
+    });
+    
+    // キャンセルされた場合は追加しない
+    if (!selectedFolder) {
+      return;
+    }
+    
+    let virtualFolderId: string | null = null;
+    
+    // Uncategorizedを選択
+    if (selectedFolder.label === '$(inbox) Uncategorized') {
+      virtualFolderId = null;
+    }
+    // 新規フォルダ作成
+    else if (selectedFolder.label === '$(add) Create New Folder') {
+      const folderName = await vscode.window.showInputBox({
+        prompt: 'Enter new folder name',
+        placeHolder: 'e.g. Work, Personal, etc.'
+      });
+      
+      if (folderName && folderName.trim()) {
+        const newFolderId = 'vf-' + Date.now();
+        if (!meta.virtualFolders) {
+          meta.virtualFolders = [];
+        }
+        meta.virtualFolders.push({
+          id: newFolderId,
+          name: folderName.trim(),
+          order: meta.virtualFolders.length
+        });
+        this.saveFavoritesMeta(meta);
+        virtualFolderId = newFolderId;
+      } else {
+        // フォルダ名が入力されなかった場合はキャンセル
+        return;
+      }
+    }
+    // 既存フォルダを選択
+    else {
+      // labelから "$(folder) " を削除してフォルダ名を取得
+      const folderName = selectedFolder.label.replace('$(folder) ', '');
+      const folder = virtualFolders.find(f => f.name === folderName);
+      virtualFolderId = folder ? folder.id : null;
+    }
+
+    await this.addFavorite(relativePath, '', true, virtualFolderId);
+  }
+
+  // Add File with Context: 現在のファイルをプリフィルしてフォームを開く
+  private async addFileWithContext() {
+    const editor = vscode.window.activeTextEditor;
+    
+    if (editor) {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+      if (workspaceFolder) {
+        const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+        
+        // 既に登録されているか確認
+        const favorites = this.loadFavorites();
+        const isAlreadyRegistered = favorites[relativePath] !== undefined;
+        
+        // Webviewにファイルパスをプリフィルするよう通知
+        // 既に登録されている場合は空のフォーム、登録されていない場合はパスをプリフィル
+        if (this._view) {
+          this._view.webview.postMessage({
+            command: 'openAddFileForm',
+            filePath: isAlreadyRegistered ? '' : relativePath
+          });
+        }
+        return;
+      }
+    }
+    
+    // ファイルが開いていない場合は空のフォームを開く
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: 'openAddFileForm',
+        filePath: ''
+      });
+    }
   }
 
   private async editFavorite(oldPath: string, newPath: string, description: string) {
     const favorites = this.loadFavorites();
     
-    const oldOrder = favorites[oldPath]?.order;
+    const oldData = favorites[oldPath];
+    if (!oldData) {
+      vscode.window.showErrorMessage('File not found in favorites');
+      return;
+    }
     
     if (oldPath !== newPath) {
       delete favorites[oldPath];
@@ -744,7 +889,9 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     favorites[newPath] = { 
       path: newPath, 
       description,
-      order: oldOrder !== undefined ? oldOrder : this.nextFavoriteOrder++
+      order: oldData.order !== undefined ? oldData.order : this.nextFavoriteOrder++,
+      isRelative: oldData.isRelative !== undefined ? oldData.isRelative : true,
+      virtualFolderId: oldData.virtualFolderId
     };
     this.saveFavorites(favorites);
 
@@ -759,7 +906,327 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.refresh();
   }
 
-  private async openFile(filePath: string) {
+  // 仮想フォルダを作成
+  private async createVirtualFolder(name: string, parentId?: string | null) {
+    if (!name || !name.trim()) {
+      vscode.window.showErrorMessage('Folder name is required');
+      return;
+    }
+
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      meta.virtualFolders = [];
+    }
+
+    // パス指定の処理（a/b 形式）
+    const pathParts = name.trim().split('/').filter(part => part.trim());
+    
+    if (pathParts.length === 0) {
+      vscode.window.showErrorMessage('Folder name is required');
+      return;
+    }
+
+    // parentIdを正規化（undefined を null に統一）
+    let currentParentId: string | null = parentId === undefined || parentId === null ? null : parentId;
+    let createdFolders: string[] = [];
+
+    // 各パス部分を順番に作成
+    for (let i = 0; i < pathParts.length; i++) {
+      const folderName = pathParts[i].trim();
+      
+      // 既存のフォルダを検索（parentIdも正規化して比較）
+      const existingFolder = meta.virtualFolders.find(f => {
+        const fParentId = f.parentId === undefined || f.parentId === null ? null : f.parentId;
+        return f.name === folderName && fParentId === currentParentId;
+      });
+
+      if (existingFolder) {
+        // 既に存在する場合は、そのIDを次の親として使用
+        currentParentId = existingFolder.id;
+        createdFolders.push(folderName + ' (existing)');
+      } else {
+        // 新しいフォルダを作成（IDの衝突を避けるためランダム値を追加）
+        const id = 'vf-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+        const order = meta.virtualFolders.length;
+
+        meta.virtualFolders.push({
+          id: id,
+          name: folderName,
+          order: order,
+          parentId: currentParentId
+        });
+
+        currentParentId = id;
+        createdFolders.push(folderName);
+      }
+    }
+
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    
+    if (pathParts.length > 1) {
+      vscode.window.showInformationMessage(`Created folder path: ${pathParts.join(' / ')}`);
+    } else {
+      const parentFolder = parentId ? meta.virtualFolders.find(f => f.id === parentId) : null;
+      const location = parentFolder ? `in "${parentFolder.name}"` : 'at root';
+      vscode.window.showInformationMessage(`Created virtual folder "${pathParts[0]}" ${location}`);
+    }
+  }
+
+  // 仮想フォルダをリネーム
+  private async renameVirtualFolder(id: string, newName: string) {
+    if (!newName || !newName.trim()) {
+      vscode.window.showErrorMessage('Folder name is required');
+      return;
+    }
+
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      return;
+    }
+
+    const folder = meta.virtualFolders.find(f => f.id === id);
+    if (!folder) {
+      vscode.window.showErrorMessage('Virtual folder not found');
+      return;
+    }
+
+    folder.name = newName.trim();
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    vscode.window.showInformationMessage(`Renamed to "${newName}"`);
+  }
+
+  // 仮想フォルダを削除
+  private async deleteVirtualFolder(id: string) {
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      return;
+    }
+
+    const folderIndex = meta.virtualFolders.findIndex(f => f.id === id);
+    if (folderIndex === -1) {
+      vscode.window.showErrorMessage('Virtual folder not found');
+      return;
+    }
+
+    const folderName = meta.virtualFolders[folderIndex].name;
+    
+    // 子フォルダのIDを再帰的に収集
+    const getAllChildFolderIds = (parentId: string): string[] => {
+      const childIds: string[] = [];
+      meta.virtualFolders?.forEach(folder => {
+        if (folder.parentId === parentId) {
+          childIds.push(folder.id);
+          // 再帰的に孫フォルダも収集
+          childIds.push(...getAllChildFolderIds(folder.id));
+        }
+      });
+      return childIds;
+    };
+    
+    const allFolderIdsToDelete = [id, ...getAllChildFolderIds(id)];
+    
+    // すべての削除対象フォルダをリストから削除
+    meta.virtualFolders = meta.virtualFolders.filter(f => !allFolderIdsToDelete.includes(f.id));
+
+    // このフォルダ（および子孫フォルダ）に所属していたファイルのvirtualFolderIdをnullに設定
+    const favorites = this.loadFavorites();
+    let updated = false;
+    Object.keys(favorites).forEach(path => {
+      if (allFolderIdsToDelete.includes(favorites[path].virtualFolderId as string)) {
+        favorites[path].virtualFolderId = null;
+        updated = true;
+      }
+    });
+
+    this.saveFavoritesMeta(meta);
+    if (updated) {
+      this.saveFavorites(favorites);
+    }
+    this.refresh();
+    vscode.window.showInformationMessage(`Deleted virtual folder "${folderName}" and moved all files to Uncategorized`);
+  }
+
+  // 仮想フォルダの色を変更
+  private async changeFolderColor(id: string, color: string) {
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      return;
+    }
+
+    const folder = meta.virtualFolders.find(f => f.id === id);
+    if (!folder) {
+      vscode.window.showErrorMessage('Virtual folder not found');
+      return;
+    }
+
+    folder.color = color;
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    vscode.window.showInformationMessage(`Changed color to ${color === 'currentColor' ? 'Default' : color}`);
+  }
+
+  // UI付きで色変更
+  private async changeFolderColorWithUI(id: string) {
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) return;
+
+    const folder = meta.virtualFolders.find(f => f.id === id);
+    if (!folder) return;
+
+    const colors = [
+      { label: '$(symbol-color) Default', value: 'currentColor' },
+      { label: '$(symbol-color) Blue', value: '#4A9EFF' },
+      { label: '$(symbol-color) Green', value: '#4CAF50' },
+      { label: '$(symbol-color) Orange', value: '#FF9800' },
+      { label: '$(symbol-color) Purple', value: '#9C27B0' },
+      { label: '$(symbol-color) Red', value: '#F44336' },
+      { label: '$(symbol-color) Pink', value: '#E91E63' },
+      { label: '$(symbol-color) Teal', value: '#009688' },
+      { label: '$(symbol-color) Yellow', value: '#FFC107' }
+    ];
+
+    const selected = await vscode.window.showQuickPick(colors, {
+      placeHolder: `Choose a color for "${folder.name}"`
+    });
+
+    if (selected) {
+      await this.changeFolderColor(id, selected.value);
+    }
+  }
+
+  // UI付きでリネーム
+  private async renameVirtualFolderWithUI(id: string, currentName: string) {
+    const newName = await vscode.window.showInputBox({
+      prompt: 'Enter new folder name',
+      value: currentName,
+      validateInput: (value) => {
+        if (!value || !value.trim()) {
+          return 'Folder name is required';
+        }
+        return null;
+      }
+    });
+
+    if (newName && newName.trim() && newName.trim() !== currentName) {
+      await this.renameVirtualFolder(id, newName.trim());
+    }
+  }
+
+  // 確認付きで削除
+  private async deleteVirtualFolderWithConfirm(id: string, folderName: string) {
+    const answer = await vscode.window.showWarningMessage(
+      `Delete folder "${folderName}"? Files will be moved to "Uncategorized".`,
+      { modal: true },
+      'Delete'
+    );
+
+    if (answer === 'Delete') {
+      await this.deleteVirtualFolder(id);
+    }
+  }
+
+  // UI付きでサブフォルダ作成
+  private async createSubfolderWithUI(parentId: string, parentName: string) {
+    const name = await vscode.window.showInputBox({
+      prompt: `Create subfolder in "${parentName}"`,
+      placeHolder: 'e.g. Components',
+      validateInput: (value) => {
+        if (!value || !value.trim()) {
+          return 'Folder name is required';
+        }
+        return null;
+      }
+    });
+
+    if (name && name.trim()) {
+      await this.createVirtualFolder(name.trim(), parentId);
+    }
+  }
+
+  // ファイルを別の仮想フォルダに移動
+  private async moveFileToFolder(filePath: string, targetFolderId: string | null) {
+    const favorites = this.loadFavorites();
+    
+    if (!favorites[filePath]) {
+      vscode.window.showErrorMessage('File not found in favorites');
+      return;
+    }
+
+    const oldFolderId = favorites[filePath].virtualFolderId;
+    favorites[filePath].virtualFolderId = targetFolderId;
+    
+    this.saveFavorites(favorites);
+    this.refresh();
+    
+    // フォルダ名を取得
+    let targetFolderName = 'No Folder';
+    if (targetFolderId) {
+      const meta = this.loadFavoritesMeta();
+      const targetFolder = meta.virtualFolders?.find(f => f.id === targetFolderId);
+      if (targetFolder) {
+        targetFolderName = targetFolder.name;
+      }
+    }
+    
+    const fileName = path.basename(filePath);
+    vscode.window.showInformationMessage(`Moved "${fileName}" to "${targetFolderName}"`);
+  }
+
+  // 仮想フォルダを別の仮想フォルダに移動（サブフォルダ化）
+  private async moveFolderToFolder(folderId: string, targetParentId: string | null) {
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      return;
+    }
+
+    const folder = meta.virtualFolders.find(f => f.id === folderId);
+    if (!folder) {
+      vscode.window.showErrorMessage('Folder not found');
+      return;
+    }
+
+    // 自分自身には移動できない
+    if (folderId === targetParentId) {
+      vscode.window.showErrorMessage('Cannot move folder into itself');
+      return;
+    }
+
+    // 循環参照チェック（自分の子孫フォルダには移動できない）
+    if (targetParentId && this.isDescendant(meta.virtualFolders, targetParentId, folderId)) {
+      vscode.window.showErrorMessage('Cannot move folder into its own descendant');
+      return;
+    }
+
+    const oldParentId = folder.parentId;
+    folder.parentId = targetParentId;
+    
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    
+    // 移動先フォルダ名を取得
+    let targetFolderName = 'Root';
+    if (targetParentId) {
+      const targetFolder = meta.virtualFolders.find(f => f.id === targetParentId);
+      if (targetFolder) {
+        targetFolderName = targetFolder.name;
+      }
+    }
+    
+    vscode.window.showInformationMessage(`Moved folder "${folder.name}" to "${targetFolderName}"`);
+  }
+
+  // フォルダAがフォルダBの子孫かどうかチェック
+  private isDescendant(folders: VirtualFolder[], checkId: string, ancestorId: string): boolean {
+    const folder = folders.find(f => f.id === checkId);
+    if (!folder) return false;
+    if (!folder.parentId) return false;
+    if (folder.parentId === ancestorId) return true;
+    return this.isDescendant(folders, folder.parentId, ancestorId);
+  }
+
+  private async openFile(filePath: string, openToSide: boolean = false) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
       vscode.window.showErrorMessage('No workspace folder is open');
@@ -776,9 +1243,17 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       const config = vscode.workspace.getConfiguration('core-anchor');
       const openInPreview = config.get<boolean>('ui.openInPreview', true);
       
-      await vscode.window.showTextDocument(document, {
-        preview: openInPreview
-      });
+      // openToSideパラメータで分岐
+      if (openToSide) {
+        await vscode.window.showTextDocument(document, {
+          preview: openInPreview,
+          viewColumn: vscode.ViewColumn.Beside
+        });
+      } else {
+        await vscode.window.showTextDocument(document, {
+          preview: openInPreview
+        });
+      }
     } catch (error) {
       vscode.window.showErrorMessage(`Cannot open file: ${filePath}`);
     }
@@ -907,14 +1382,91 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
 
     const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
 
+    // フォルダ選択QuickPick
+    const meta = this.loadFavoritesMeta();
+    const virtualFolders = meta.virtualFolders || [];
+    
+    const folderItems: vscode.QuickPickItem[] = [
+      {
+        label: '$(inbox) Uncategorized',
+        description: ''
+      }
+    ];
+    
+    folderItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+    
+    folderItems.push({
+      label: '$(add) Create New Folder',
+      description: ''
+    });
+    
+    if (virtualFolders.length > 0) {
+      folderItems.push({ label: '', kind: vscode.QuickPickItemKind.Separator });
+      
+      virtualFolders.forEach(folder => {
+        folderItems.push({
+          label: `$(folder) ${folder.name}`,
+          description: ''
+        });
+      });
+    }
+    
+    const selectedFolder = await vscode.window.showQuickPick(folderItems, {
+      placeHolder: 'Select a folder (or press Escape to cancel)',
+      title: 'Add to Favorites'
+    });
+    
+    // キャンセルされた場合は追加しない
+    if (!selectedFolder) {
+      return;
+    }
+    
+    let virtualFolderId: string | null = null;
+    
+    // Uncategorizedを選択
+    if (selectedFolder.label === '$(inbox) Uncategorized') {
+      virtualFolderId = null;
+    }
+    // 新規フォルダ作成
+    else if (selectedFolder.label === '$(add) Create New Folder') {
+      const folderName = await vscode.window.showInputBox({
+        prompt: 'Enter new folder name',
+        placeHolder: 'e.g. Work, Personal, etc.'
+      });
+      
+      if (folderName && folderName.trim()) {
+        const newFolderId = 'vf-' + Date.now();
+        if (!meta.virtualFolders) {
+          meta.virtualFolders = [];
+        }
+        meta.virtualFolders.push({
+          id: newFolderId,
+          name: folderName.trim(),
+          order: meta.virtualFolders.length
+        });
+        this.saveFavoritesMeta(meta);
+        virtualFolderId = newFolderId;
+      } else {
+        // フォルダ名が入力されなかった場合はキャンセル
+        return;
+      }
+    }
+    // 既存フォルダを選択
+    else {
+      // labelから "$(folder) " を削除してフォルダ名を取得
+      const folderName = selectedFolder.label.replace('$(folder) ', '');
+      const folder = virtualFolders.find(f => f.name === folderName);
+      virtualFolderId = folder ? folder.id : null;
+    }
+
     const description = await vscode.window.showInputBox({
-      prompt: 'Enter file description',
+      prompt: 'Enter file description (optional)',
       placeHolder: 'e.g. Entry point',
     });
 
     if (description === undefined) return;
 
-    await this.addFavorite(relativePath, description);
+    await this.addFavorite(relativePath, description, true, virtualFolderId);
   }
 
   async addFavoriteFromCommand() {
@@ -1187,8 +1739,8 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async jumpToBookmark(filePath: string, line: number) {
-    await this.openFile(filePath);
+  private async jumpToBookmark(filePath: string, line: number, openToSide: boolean = false) {
+    await this.openFile(filePath, openToSide);
     
     const editor = vscode.window.activeTextEditor;
     if (editor) {
@@ -1227,8 +1779,35 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     return getHtmlContent();
   }
 
+  // ショートカットでカーソル行のブックマーク情報をコード上にポップアップ表示
+  showBookmarkAtCursor() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+
+    const line = editor.selection.active.line;
+    const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+    const bookmarks = this.loadBookmarks();
+
+    if (bookmarks[relativePath]) {
+      const bookmark = bookmarks[relativePath].find(b => b.line === line);
+      if (bookmark) {
+        // 既存のホバーを表示するだけ（editor.action.showHoverコマンド）
+        vscode.commands.executeCommand('editor.action.showHover');
+        return;
+      }
+    }
+
+    // ブックマークがない場合は何も表示しない
+  }
+
   updateDecorations(editor: vscode.TextEditor) {
-    if (!this.decorationTypes) return;
+    if (!this.decorationTypes) {
+      console.error('[Core Anchor] CRITICAL ERROR: decorationTypes is NULL or UNDEFINED!');
+      console.error('[Core Anchor] This means setDecorationTypes() was not called or failed');
+      return;
+    }
 
     const bookmarks = this.loadBookmarks();
     const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
@@ -1236,34 +1815,118 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const decorationsByType: Map<BookmarkIconType, vscode.DecorationOptions[]> = new Map();
     
     if (bookmarks[relativePath]) {
-      for (const bookmark of bookmarks[relativePath]) {
+      bookmarks[relativePath].forEach((bookmark, index) => {
         const iconType = bookmark.iconType || 'default';
-        const range = new vscode.Range(bookmark.line, 0, bookmark.line, 0);
+        
+        // 行内容を取得してrangeを決定
+        let lineContent = '';
+        let lineLength = 0;
+        try {
+          if (bookmark.line < editor.document.lineCount) {
+            const lineText = editor.document.lineAt(bookmark.line).text;
+            lineContent = lineText.trim();
+            lineLength = lineText.length;
+            
+            // 長すぎる場合は切り詰め
+            if (lineContent.length > 80) {
+              const original = lineContent;
+              lineContent = lineContent.substring(0, 77) + '...';
+            }
+          } else {
+            console.warn(`[Core Anchor] ⚠️  WARNING: Bookmark line ${bookmark.line} >= document line count ${editor.document.lineCount}`);
+          }
+        } catch (error) {
+          console.error('[Core Anchor] ❌ ERROR getting line content:', error);
+          if (error instanceof Error) {
+            console.error('[Core Anchor] Error message:', error.message);
+            console.error('[Core Anchor] Error stack:', error.stack);
+          }
+        }
+        
+        // 行の実際の文字がある範囲のみをカバー
+        const range = new vscode.Range(bookmark.line, 0, bookmark.line, lineLength);
+        
+        // ホバーメッセージ：種類+内容のみ（コードプレビューなし）
+        const hoverText = bookmark.label 
+          ? `**${ICON_TYPE_LABELS[iconType]}**: ${bookmark.label}` 
+          : `**${ICON_TYPE_LABELS[iconType]}** (Line ${bookmark.line + 1})`;
+        
+        const hoverMsg = new vscode.MarkdownString(hoverText);
+        hoverMsg.isTrusted = true;
         
         if (!decorationsByType.has(iconType)) {
           decorationsByType.set(iconType, []);
         }
         
-        decorationsByType.get(iconType)!.push({
+        const decoration: vscode.DecorationOptions = {
           range,
-          hoverMessage: `${ICON_TYPE_LABELS[iconType]}: ${bookmark.label}`,
-        });
-      }
+          hoverMessage: hoverMsg,
+        };
+        
+        decorationsByType.get(iconType)!.push(decoration);
+      });
     }
+    
+    let totalDecorationsApplied = 0;
     
     this.decorationTypes.forEach((decorationType, iconType) => {
       const decorations = decorationsByType.get(iconType) || [];
-      editor.setDecorations(decorationType, decorations);
+      
+      if (decorations.length > 0) {
+        totalDecorationsApplied += decorations.length;
+      }
+      
+      try {
+        editor.setDecorations(decorationType, decorations);
+      } catch (error) {
+        console.error(`[Core Anchor]   ❌ ERROR applying decorations:`, error);
+      }
     });
   }
 
   refresh() {
-    //console.log('Refreshing webview...');
     if (this._view) {
       const favorites = this.loadFavorites();
       const bookmarks = this.loadBookmarks();
       const favoritesMeta = this.loadFavoritesMeta();
       const bookmarksMeta = this.loadBookmarksMeta();
+      
+      // ブックマークに行内容を追加
+      const bookmarksWithContent: any = {};
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      
+      if (workspaceFolders) {
+        Object.entries(bookmarks).forEach(([filePath, marks]) => {
+          const fullPath = path.join(workspaceFolders[0].uri.fsPath, filePath);
+          bookmarksWithContent[filePath] = [];
+          
+          marks.forEach(mark => {
+            let lineContent = '';
+            try {
+              if (fs.existsSync(fullPath)) {
+                const content = fs.readFileSync(fullPath, 'utf-8');
+                const lines = content.split('\n');
+                if (mark.line < lines.length) {
+                  lineContent = lines[mark.line].trim();
+                  // 長すぎる場合は切り詰め
+                  if (lineContent.length > 80) {
+                    lineContent = lineContent.substring(0, 77) + '...';
+                  }
+                }
+              }
+            } catch (error) {
+              // エラーの場合は空文字列
+            }
+            
+            bookmarksWithContent[filePath].push({
+              ...mark,
+              lineContent: lineContent
+            });
+          });
+        });
+      } else {
+        Object.assign(bookmarksWithContent, bookmarks);
+      }
       
       // ファイルアイコンのマッピングを生成
       const fileIcons: { [key: string]: string } = {};
@@ -1289,7 +1952,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       });
       
       // Bookmarksのファイルアイコンも生成
-      Object.keys(bookmarks).forEach(filePath => {
+      Object.keys(bookmarksWithContent).forEach(filePath => {
         // 既に生成済みの場合はスキップ
         if (fileIcons[filePath]) return;
         
@@ -1313,18 +1976,23 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         }
       });
       
-      //console.log('Sending update to webview - favorites:', favorites, 'bookmarks:', bookmarks);
+      // 設定値を取得
+      const config = vscode.workspace.getConfiguration('core-anchor');
+      const defaultPathType = config.get<string>('favorites.defaultPathType', 'relative');
+      const showBookmarkTooltip = config.get<boolean>('bookmarks.showTooltip', true);
       
       this._view.webview.postMessage({
         command: 'update',
         favorites: favorites,
-        bookmarks: bookmarks,
+        bookmarks: bookmarksWithContent,
         favoritesMeta: favoritesMeta,
         bookmarksMeta: bookmarksMeta,
         fileIcons: fileIcons,
+        settings: {
+          defaultPathType: defaultPathType,
+          showBookmarkTooltip: showBookmarkTooltip
+        }
       });
-    } else {
-      //console.log('Webview not initialized yet');
     }
   }
 }

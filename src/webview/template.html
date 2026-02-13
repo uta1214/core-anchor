@@ -12,11 +12,6 @@
         <span class="section-title">Favorite Files</span>
       </div>
       <div style="display: flex; gap: 4px; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <button class="depth-btn" onclick="decreaseFolderDepth(); event.stopPropagation();" title="Decrease folder depth">−</button>
-          <span class="depth-display" id="folderDepthDisplay">1</span>
-          <button class="depth-btn" onclick="increaseFolderDepth(); event.stopPropagation();" title="Increase folder depth">+</button>
-        </div>
         <div class="mode-switch">
           <button class="mode-btn" id="globalModeBtn" onclick="switchFavoriteMode('global'); event.stopPropagation();" title="Global favorites">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -38,14 +33,43 @@
         <input type="text" id="favoriteSearch" class="search-input" placeholder="Search favorites..." oninput="filterFavorites()" />
       </div>
       <div class="debug-info" id="favoriteDebug">Waiting...</div>
+      
+      
+      <!-- Virtual Folders & Files Display -->
       <div id="favorites"></div>
+      
       <div class="add-btn-container">
-        <button class="toggle-add-btn quick-add-btn" onclick="quickAddCurrentFile()">Quick Add Current File</button>
-        <button class="toggle-add-btn" onclick="toggleFavoriteForm()">+ Add File</button>
+        <button class="toggle-add-btn quick-add-btn" onclick="addFileWithContext()">+ Add File</button>
+        <button class="toggle-add-btn" onclick="toggleVirtualFolderForm()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 4px;"><path d="M1.5 3H6.5L8 5H14.5V13H1.5V3Z" stroke="currentColor" stroke-width="1.5"/></svg>New Folder</button>
       </div>
+      
+      <!-- Virtual Folder Form -->
+      <div class="add-form" id="virtualFolderForm">
+        <input type="text" id="virtualFolderName" placeholder="Folder name" />
+        <div class="edit-form-buttons">
+          <button class="save-btn" onclick="createVirtualFolder()">Create</button>
+          <button class="cancel-btn" onclick="cancelVirtualFolderForm()">Cancel</button>
+        </div>
+      </div>
+      
       <div class="add-form" id="favoriteForm">
         <input type="text" id="filePath" placeholder="File path" />
         <input type="text" id="fileDesc" placeholder="Description" />
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <label style="display: flex; align-items: center; gap: 4px; font-size: var(--font-size-button);">
+            <input type="checkbox" id="fileIsRelative" checked />
+            Relative path
+          </label>
+        </div>
+        <div class="custom-select" id="virtualFolderSelect">
+          <div class="custom-select-trigger" onclick="toggleVirtualFolderSelect()">
+            <div class="custom-select-value">
+              <span id="virtualFolderSelectText">Uncategorized</span>
+            </div>
+            <span class="custom-select-arrow">∨</span>
+          </div>
+          <div class="custom-select-options" id="virtualFolderSelectOptions"></div>
+        </div>
         <div class="edit-form-buttons">
           <button class="save-btn" onclick="addFavorite()">Add</button>
           <button class="cancel-btn" onclick="cancelAddFavorite()">Cancel</button>

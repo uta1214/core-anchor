@@ -2,7 +2,7 @@
   "name": "core-anchor",
   "displayName": "Core Anchor",
   "description": "Manage favorite files and bookmarks with a beautiful, customizable interface",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "uta-orange-1214",
   "author": {
     "name": "uta"
@@ -50,6 +50,18 @@
       {
         "command": "core-anchor.moveBookmarkDown",
         "title": "Core Anchor: Move Bookmark Down"
+      },
+      {
+        "command": "core-anchor.showBookmarkAtCursor",
+        "title": "Core Anchor: Show Bookmark at Cursor"
+      },
+      {
+        "command": "core-anchor.goToPreviousBookmark",
+        "title": "Core Anchor: Go to Previous Bookmark"
+      },
+      {
+        "command": "core-anchor.goToNextBookmark",
+        "title": "Core Anchor: Go to Next Bookmark"
       }
     ],
     "keybindings": [
@@ -67,12 +79,30 @@
       },
       {
         "command": "core-anchor.moveBookmarkUp",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "core-anchor.moveBookmarkDown",
+        "key": "ctrl+alt+d",
+        "mac": "cmd+alt+d",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "core-anchor.showBookmarkAtCursor",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "core-anchor.goToPreviousBookmark",
         "key": "ctrl+alt+up",
         "mac": "cmd+alt+up",
         "when": "editorTextFocus"
       },
       {
-        "command": "core-anchor.moveBookmarkDown",
+        "command": "core-anchor.goToNextBookmark",
         "key": "ctrl+alt+down",
         "mac": "cmd+alt+down",
         "when": "editorTextFocus"
@@ -175,6 +205,21 @@
           "type": "boolean",
           "default": true,
           "description": "Open files in preview mode when clicking from favorites or bookmarks. Set to false to open in a pinned tab. / お気に入りやブックマークからファイルを開く際にプレビューモードで開きます。falseに設定すると固定タブで開きます。"
+        },
+        "core-anchor.favorites.defaultPathType": {
+          "type": "string",
+          "default": "relative",
+          "enum": ["relative", "absolute"],
+          "enumDescriptions": [
+            "Relative path (from workspace root) / 相対パス（ワークスペースルートから）",
+            "Absolute path (full file path) / 絶対パス（完全なファイルパス）"
+          ],
+          "description": "Default path type when adding new favorite files / 新しいお気に入りファイルを追加する際のデフォルトパスタイプ"
+        },
+        "core-anchor.bookmarks.showTooltip": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show bookmark details on hover (line number and description). Shortcut key tooltip is always visible. / ホバー時にブックマークの詳細を表示（行番号と説明）。ショートカットキーのツールチップは常に表示されます。"
         }
       }
     }

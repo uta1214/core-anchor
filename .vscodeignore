@@ -14,3 +14,7 @@ tasks.json
 *.log
 *Zone.Identifier
 .gitignore
+
+GPATH
+GRTAGS
+GTAGS

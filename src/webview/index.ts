@@ -29,9 +29,9 @@ export function getHtmlContent(): string {
     .replace('<!-- SCRIPT_PLACEHOLDER -->', `
       <script>
         ${uiJs}
-        ${mainJs}
         ${favoritesJs}
         ${bookmarksJs}
+        ${mainJs}
       </script>
   `);
 }

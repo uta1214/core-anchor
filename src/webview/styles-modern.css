@@ -742,6 +742,26 @@ body {
   margin: 3px 0; 
 }
 
+/* Drag & Drop styles */
+.item[draggable="true"] {
+  cursor: grab;
+}
+
+.item.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.folder-group.drag-over {
+  background: var(--vscode-list-dropBackground);
+  border: 2px dashed var(--vscode-list-activeSelectionBackground);
+  border-radius: 4px;
+}
+
+.folder-group.drag-over .folder-header {
+  background: var(--vscode-list-hoverBackground);
+}
+
 /* レスポンシブ調整 */
 @container sidebar (max-width: 280px) {
   :root {
@@ -773,4 +793,81 @@ body {
     min-width: 36px;
     padding: 3px 4px;
   }
+}/* ================================
+   styles-modern.css 用の追加スタイル
+   
+   以下を styles-modern.css の末尾に追加してください
+   （@container sidebar の後、ファイルの最後に追加）
+   ================================ */
+
+/* ホバーボタン・選択状態のスタイル */
+.folder-header.selected,
+.item.selected {
+  background: var(--vscode-list-activeSelectionBackground);
+  border-left: 3px solid var(--vscode-focusBorder);
+}
+
+.folder-header.selected .folder-name,
+.item.selected .item-file {
+  font-weight: 600;
+}
+
+.folder-header:focus,
+.item:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.folder-name,
+.item-file {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
+.folder-header,
+.item {
+  transition: background 0.15s ease, border-left 0.15s ease;
+}
+
+/* ホバー時のボタン表示 */
+.item-buttons {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.item:hover .item-buttons {
+  opacity: 1;
+}
+
+.folder-buttons {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.folder-header:hover .folder-buttons {
+  opacity: 1;
+}
+
+.item-buttons .btn:hover,
+.folder-buttons .btn:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+  transform: scale(1.1);
+}
+
+/* ブックマーク行プレビュー */
+.bookmark-preview {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  padding-left: 20px;
+  font-family: var(--vscode-editor-font-family);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+  opacity: 0.7;
+  font-style: italic;
 }

@@ -9,7 +9,14 @@ let currentIconFilter = '';
 function toggleBookmarkForm() {
   const form = document.getElementById('bookmarkForm');
   form.classList.toggle('active');
-  if (form.classList.contains('active')) document.getElementById('bookmarkFile').focus();
+  if (form.classList.contains('active')) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        document.getElementById('bookmarkFile').focus();
+      });
+    });
+  }
 }
 
 function cancelAddBookmark() {
@@ -31,12 +38,33 @@ function addBookmarkManual() {
   }
 }
 
+function toggleEditBookmark(filePath, line) {
+  const form = document.getElementById('edit-bm-' + safeId(filePath + line));
+  
+  if (form && form.classList.contains('active')) {
+    // 既に開いている場合はキャンセル
+    cancelEditBookmark(filePath, line);
+  } else {
+    // 閉じている場合は開く
+    startEditBookmark(filePath, line);
+  }
+}
+
 function startEditBookmark(filePath, line) {
   document.querySelectorAll('.edit-form').forEach(f => f.classList.remove('active'));
   const form = document.getElementById('edit-bm-' + safeId(filePath + line));
   if (form) { 
     form.classList.add('active'); 
-    editingBookmark = filePath + ':' + line; 
+    editingBookmark = filePath + ':' + line;
+    
+    // 自動フォーカス
+    setTimeout(() => {
+      const lineInput = form.querySelector('.edit-line');
+      if (lineInput) {
+        lineInput.focus();
+        lineInput.select();
+      }
+    }, 50);
   }
 }
 
@@ -77,11 +105,13 @@ function toggleFileGroup(fileId) {
     expandedFiles.delete(fileId);
     items.classList.remove('expanded');
     icon.classList.remove('expanded');
+    icon.style.transform = 'rotate(0deg)';
     items.style.display = 'none';
   } else {
     expandedFiles.add(fileId);
     items.classList.add('expanded');
     icon.classList.add('expanded');
+    icon.style.transform = 'rotate(90deg)';
     items.style.display = 'block';
   }
   saveState();
@@ -169,11 +199,12 @@ function updateBookmarks(bookmarks) {
       { label: 'Delete All Bookmarks', action: () => vscode.postMessage({ command: 'deleteAllBookmarks', filePath }) },
     ]);
     
-    // ファイルアイコンを取得
     const fileIconSrc = fileIcons[filePath] || '';
     const fileIconHtml = fileIconSrc ? '<img src="' + fileIconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" />' : '📄 ';
     
-    headerDiv.innerHTML = '<span id="fileicon-' + fileId + '" class="file-icon' + (isExpanded ? ' expanded' : '') + '">▶</span><span class="file-name">' + fileIconHtml + escapeHtml(filePath) + '</span><span class="file-count">(' + marks.length + ')</span>';
+    const expandIconHtml = '<span id="fileicon-' + fileId + '" class="file-icon' + (isExpanded ? ' expanded' : '') + '" style="display:inline-flex;align-items:center;justify-content:center;width:16px;transition:transform 0.2s;' + (isExpanded ? 'transform:rotate(90deg);' : '') + '">' + EXPAND_ICON + '</span>';
+    
+    headerDiv.innerHTML = expandIconHtml + '<span class="file-name">' + fileIconHtml + escapeHtml(filePath) + '</span><span class="file-count">' + marks.length + '</span>';
     
     const itemsDiv = document.createElement('div');
     itemsDiv.id = 'fileitems-' + fileId;
@@ -188,16 +219,90 @@ function updateBookmarks(bookmarks) {
       const selectId = 'editIconSelect-' + bmId;
       const iconSrc = iconPaths[iconType] || '';
       const safeFilePath = filePath.replace(/'/g, "\\'").replace(/\\\\/g, "\\\\");
+      
+      // ツールチップ用のテキストを作成
+      const tooltipText = filePath + '\nLine ' + (mark.line + 1) + ': ' + mark.label;
+      
       const itemDiv = document.createElement('div');
       itemDiv.className = 'item';
-      itemDiv.innerHTML = '<div class="item-content" onclick="jumpToBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><div class="item-desc"><img src="' + iconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" /> ' + labelEsc + '</div><div class="item-line">Line ' + (mark.line + 1) + '</div></div><div class="item-buttons"><button class="btn" onclick="event.stopPropagation(); startEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1.5L14.5 4.5L5 14H2V11L11.5 1.5Z" stroke="currentColor" stroke-width="1.5"/></svg></button><button class="btn" onclick="event.stopPropagation(); removeBookmark(\'' + safeFilePath + '\', ' + mark.line + ')"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" stroke-width="1.5"/></svg></button></div>';
+      
+      // item-contentを作成
+      const itemContent = document.createElement('div');
+      itemContent.className = 'item-content';
+      // title属性を削除（ホバー表示なし）
+      itemContent.onclick = () => jumpToBookmark(filePath, mark.line);
+      
+      const itemDesc = document.createElement('div');
+      itemDesc.className = 'item-desc';
+      itemDesc.innerHTML = '<img src="' + iconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" /> ' + labelEsc;
+      
+      const itemLine = document.createElement('div');
+      itemLine.className = 'item-line';
+      itemLine.textContent = 'Line ' + (mark.line + 1);
+      
+      itemContent.appendChild(itemDesc);
+      itemContent.appendChild(itemLine);
+      
+      // ボタンを作成
+      const itemButtons = document.createElement('div');
+      itemButtons.className = 'item-buttons';
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn';
+      editBtn.setAttribute('title', 'Edit bookmark');
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleEditBookmark(filePath, mark.line);
+      };
+      editBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 1.5L14.5 4.5L5 14H2V11L11.5 1.5Z" stroke="currentColor" stroke-width="1.5"/></svg>';
+      
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn';
+      deleteBtn.setAttribute('title', 'Delete bookmark');
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        removeBookmark(filePath, mark.line);
+      };
+      deleteBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 3V1.5C5 1.22386 5.22386 1 5.5 1H10.5C10.7761 1 11 1.22386 11 1.5V3M2 3H14M12.5 3V13.5C12.5 13.7761 12.2761 14 12 14H4C3.72386 14 3.5 13.7761 3.5 13.5V3" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 6.5V10.5M9.5 6.5V10.5" stroke="currentColor" stroke-width="1.5"/></svg>';
+      
+      itemButtons.appendChild(editBtn);
+      itemButtons.appendChild(deleteBtn);
+      
+      itemDiv.appendChild(itemContent);
+      itemDiv.appendChild(itemButtons);
+      
       const editForm = document.createElement('div');
       editForm.id = 'edit-bm-' + bmId;
       editForm.className = 'edit-form';
-      editForm.innerHTML = '<input type="text" class="edit-line" placeholder="Line number" value="' + (mark.line + 1) + '" /><input type="text" class="edit-label" placeholder="Label" value="' + labelEsc + '" /><div class="custom-select" id="' + selectId + '"><div class="custom-select-trigger" onclick="toggleIconSelect(\'' + selectId + '\')"><div class="custom-select-value"><img class="custom-select-icon" id="' + selectId + 'Image" src="' + iconSrc + '" /><span id="' + selectId + 'Text">' + iconLabel + '</span></div><span class="custom-select-arrow">∨</span></div><div class="custom-select-options" id="' + selectId + 'Options"></div></div><div class="edit-form-buttons"><button class="save-btn" onclick="saveEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Save</button><button class="cancel-btn" onclick="cancelEditBookmark(\'' + safeFilePath + '\', ' + mark.line + ')">Cancel</button></div>';
+      editForm.innerHTML = `
+        <input type="text" class="edit-line" placeholder="Line number" value="${mark.line + 1}" />
+        <input type="text" class="edit-label" placeholder="Label" value="${labelEsc}" />
+        <div class="custom-select" id="${selectId}">
+          <div class="custom-select-trigger">
+            <div class="custom-select-value">
+              <img class="custom-select-icon" id="${selectId}Image" src="${iconSrc}" />
+              <span id="${selectId}Text">${iconLabel}</span>
+            </div>
+            <span class="custom-select-arrow">∨</span>
+          </div>
+          <div class="custom-select-options" id="${selectId}Options"></div>
+        </div>
+        <div class="edit-form-buttons">
+          <button class="save-btn">Save</button>
+          <button class="cancel-btn">Cancel</button>
+        </div>
+      `;
+      
+      // 🔧 FIX: DOMイベントとして追加（XSS対策）
+      const customSelectTrigger = editForm.querySelector('.custom-select-trigger');
+      const saveBtn = editForm.querySelector('.save-btn');
+      const cancelBtn = editForm.querySelector('.cancel-btn');
+      
+      if (customSelectTrigger) customSelectTrigger.onclick = () => toggleIconSelect(selectId);
+      if (saveBtn) saveBtn.onclick = () => saveEditBookmark(filePath, mark.line);
+      if (cancelBtn) cancelBtn.onclick = () => cancelEditBookmark(filePath, mark.line);
       const opts = editForm.querySelector('.custom-select-options');
       Object.keys(ICON_LABELS).forEach(type => {
-        // 'all'アイコンは編集時のセレクトに表示しない
         if (type === 'all') return;
         
         const opt = document.createElement('div');

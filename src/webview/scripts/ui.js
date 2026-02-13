@@ -79,7 +79,10 @@ document.addEventListener('contextmenu', (e) => {
 // Icon Select
 function toggleIconSelect(selectId) {
   const options = document.getElementById(selectId + 'Options');
-  if (!options) return;
+  if (!options) {
+    console.error('[ui.js] Options element not found!');
+    return;
+  }
   document.querySelectorAll('.custom-select-options').forEach(opt => {
     if (opt.id !== selectId + 'Options') opt.classList.remove('active');
   });
@@ -87,6 +90,7 @@ function toggleIconSelect(selectId) {
 }
 
 function selectIcon(selectId, iconType, label) {
+  const iconPaths = window.iconPaths || {};
   const img = document.getElementById(selectId + 'Image');
   const text = document.getElementById(selectId + 'Text');
   const options = document.getElementById(selectId + 'Options');
@@ -104,6 +108,12 @@ document.addEventListener('click', (e) => {
 });
 
 function setIconImages() {
+  
+  // グローバルスコープから参照（main.jsで定義）
+  const iconPaths = window.iconPaths || {};
+  const ICON_LABELS = window.ICON_LABELS || {};
+  
+  
   const img = document.getElementById('bookmarkIconSelectImage');
   if (img && iconPaths['default']) img.src = iconPaths['default'];
   const opts = document.getElementById('bookmarkIconSelectOptions');
@@ -140,6 +150,8 @@ function setIconImages() {
       opt.innerHTML = '<img class="custom-select-icon" src="' + (iconPaths[iconType] || '') + '" /><span>' + ICON_LABELS[iconType] + '</span>';
       filterOpts.appendChild(opt);
     });
+  } else {
+    console.error('[ui.js] iconFilterSelectOptions element not found!');
   }
   
   // 初期状態でAll Iconsのアイコンを表示
@@ -151,6 +163,7 @@ function setIconImages() {
 }
 
 function selectIconFilter(iconType, label) {
+  const iconPaths = window.iconPaths || {};
   const img = document.getElementById('iconFilterSelectImage');
   const text = document.getElementById('iconFilterSelectText');
   const options = document.getElementById('iconFilterSelectOptions');
@@ -194,9 +207,42 @@ document.addEventListener('keydown', (e) => {
     
     const activeEditForm = e.target.closest('.edit-form.active');
     if (activeEditForm) {
-      activeEditForm.classList.remove('active');
-      editingFavorite = null;
-      editingBookmark = null;
+      const formId = activeEditForm.id;
+      
+      // Favoritesの編集フォームの場合
+      if (formId.startsWith('edit-fav-')) {
+        const path = formId.replace('edit-fav-id-', '').replace(/_/g, '%');
+        const decodedPath = decodeURIComponent(path);
+        if (typeof cancelEditFavorite === 'function') {
+          cancelEditFavorite(decodedPath);
+        } else {
+          activeEditForm.classList.remove('active');
+          if (typeof editingFavorite !== 'undefined') {
+            editingFavorite = null;
+          }
+        }
+      }
+      // Bookmarksの編集フォームの場合
+      else if (formId.startsWith('edit-bm-')) {
+        if (typeof editingBookmark !== 'undefined' && editingBookmark) {
+          const [filePath, line] = editingBookmark.split(':');
+          if (typeof cancelEditBookmark === 'function') {
+            cancelEditBookmark(filePath, parseInt(line));
+          } else {
+            activeEditForm.classList.remove('active');
+            editingBookmark = null;
+          }
+        } else {
+          activeEditForm.classList.remove('active');
+        }
+      }
+      // その他の編集フォーム
+      else {
+        activeEditForm.classList.remove('active');
+        if (typeof editingFavorite !== 'undefined') editingFavorite = null;
+        if (typeof editingBookmark !== 'undefined') editingBookmark = null;
+      }
+      
       e.preventDefault();
       return;
     }
@@ -236,3 +282,9 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// グローバルに公開
+window.toggleIconSelect = toggleIconSelect;
+window.selectIcon = selectIcon;
+window.selectIconFilter = selectIconFilter;
+window.setIconImages = setIconImages;

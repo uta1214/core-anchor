@@ -151,10 +151,105 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // デバッグ用：手動でdecorationを更新
+  context.subscriptions.push(
+    vscode.commands.registerCommand('core-anchor.refreshDecorations', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        provider.updateDecorations(editor);
+        vscode.window.showInformationMessage('Core Anchor: Decorations refreshed');
+      } else {
+        vscode.window.showWarningMessage('Core Anchor: No active editor');
+      }
+    })
+  );
+
+  // ショートカットでカーソル行のブックマーク情報を表示
+  context.subscriptions.push(
+    vscode.commands.registerCommand('core-anchor.showBookmarkAtCursor', () => {
+      provider.showBookmarkAtCursor();
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('core-anchor.goToPreviousBookmark', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      
+      const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+      const bookmarks = loadBookmarks();
+      const fileBookmarks = bookmarks[relativePath] || [];
+      
+      if (fileBookmarks.length === 0) {
+        vscode.window.showInformationMessage('No bookmarks in this file');
+        return;
+      }
+      
+      const currentLine = editor.selection.active.line;
+      
+      // 現在行より前のブックマークを探す（降順にソート）
+      const previousBookmarks = fileBookmarks
+        .filter(bm => bm.line < currentLine)
+        .sort((a, b) => b.line - a.line);
+      
+      let targetBookmark;
+      if (previousBookmarks.length > 0) {
+        targetBookmark = previousBookmarks[0];
+      } else {
+        // 前のブックマークがない場合は最後のブックマークにループ
+        targetBookmark = fileBookmarks.sort((a, b) => b.line - a.line)[0];
+      }
+      
+      // ブックマークにジャンプ
+      const position = new vscode.Position(targetBookmark.line, 0);
+      editor.selection = new vscode.Selection(position, position);
+      editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+      
+      vscode.window.showInformationMessage(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
+    })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('core-anchor.goToNextBookmark', () => {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) return;
+      
+      const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+      const bookmarks = loadBookmarks();
+      const fileBookmarks = bookmarks[relativePath] || [];
+      
+      if (fileBookmarks.length === 0) {
+        vscode.window.showInformationMessage('No bookmarks in this file');
+        return;
+      }
+      
+      const currentLine = editor.selection.active.line;
+      
+      // 現在行より後のブックマークを探す（昇順にソート）
+      const nextBookmarks = fileBookmarks
+        .filter(bm => bm.line > currentLine)
+        .sort((a, b) => a.line - b.line);
+      
+      let targetBookmark;
+      if (nextBookmarks.length > 0) {
+        targetBookmark = nextBookmarks[0];
+      } else {
+        // 次のブックマークがない場合は最初のブックマークにループ
+        targetBookmark = fileBookmarks.sort((a, b) => a.line - b.line)[0];
+      }
+      
+      // ブックマークにジャンプ
+      const position = new vscode.Position(targetBookmark.line, 0);
+      editor.selection = new vscode.Selection(position, position);
+      editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+      
+      vscode.window.showInformationMessage(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
+    })
+  );
+
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
       if (editor) {
-        
         provider.updateDecorations(editor);
       }
     })
@@ -273,11 +368,11 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // 初期化完了後、既に開いているエディタにデコレーションを適用
+  // decorationTypesが設定された後に実行されることを保証
   if (vscode.window.activeTextEditor) {
     provider.updateDecorations(vscode.window.activeTextEditor);
   }
-  
-  
 }
 
 export function deactivate() {
