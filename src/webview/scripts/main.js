@@ -247,9 +247,31 @@ window.addEventListener('message', event => {
     allFavoritesData = msg.favorites;
     allBookmarksData = msg.bookmarks;
     
+    // favorites.js からアクセスできるように window に公開
+    window.favoritesMeta = favoritesMeta;
+    
     // 設定値を更新
     if (msg.settings) {
       settings = msg.settings;
+      
+      // bookmarks.js に初期開閉状態を渡す
+      if (typeof bookmarksDefaultExpandState !== 'undefined' && msg.settings.bookmarksDefaultExpandState) {
+        bookmarksDefaultExpandState = msg.settings.bookmarksDefaultExpandState;
+      }
+      
+      // favorites.js にも初期開閉状態を渡す（変数名は同じだがスコープが異なる）
+      // グローバルスコープに設定してfavorites.jsからも参照できるようにする
+      if (msg.settings.favoritesDefaultExpandState) {
+        window.favoritesDefaultExpandState = msg.settings.favoritesDefaultExpandState;
+      }
+
+      // ブックマークのグローバルソートタイプを更新
+      if (typeof globalBookmarkSortType !== 'undefined' && msg.settings.bookmarksGlobalSortType) {
+        globalBookmarkSortType = msg.settings.bookmarksGlobalSortType;
+        if (typeof updateGlobalSortButtons === 'function') {
+          updateGlobalSortButtons();
+        }
+      }
     }
     
     // 仮想フォルダ情報を更新
@@ -325,6 +347,29 @@ window.addEventListener('message', event => {
           filePathInput.focus();
         }
       }, 50);
+    }
+  } else if (msg.command === 'setHighlightedBookmark') {
+    // ブックマークをハイライト
+    console.log('[Core Anchor] Set highlighted bookmark:', { 
+      filePath: msg.filePath, 
+      line: msg.line 
+    });
+    
+    if (typeof highlightedBookmark !== 'undefined') {
+      highlightedBookmark = { filePath: msg.filePath, line: msg.line };
+      
+      // ファイルグループが閉じていたら自動展開
+      const fileId = safeId(msg.filePath);
+      const fileItems = document.getElementById('fileitems-' + fileId);
+      if (fileItems && !fileItems.classList.contains('expanded')) {
+        console.log('[Core Anchor] Auto-expanding file group:', fileId);
+        toggleFileGroup(fileId);
+      }
+      
+      // 再描画してハイライト適用
+      if (typeof updateBookmarks === 'function' && allBookmarksData) {
+        updateBookmarks(allBookmarksData);
+      }
     }
   }
 });

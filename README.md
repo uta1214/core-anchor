@@ -25,7 +25,9 @@ A powerful VS Code extension for managing your favorite files and bookmarks with
 - **Navigate Between Bookmarks**: Jump to previous/next bookmark with `Ctrl+Alt+Up/Down` (Mac: `Cmd+Alt+Up/Down`)
 - **Auto-Adjustment**: Bookmarks automatically adjust when code changes
 - **Filtering**: Filter bookmarks by icon type
-- **Sorting**: Sort by line number or added order
+- **Sorting**: Sort all bookmarks globally by line number or added order using the **Line / Order** buttons next to the "Bookmarks" section title
+  - **Line**: Sorts all bookmarks by line number (new bookmarks are inserted in line order)
+  - **Order**: Sorts all bookmarks by the order they were added (new bookmarks are appended at the bottom)
 
 ### 🎨 4 Beautiful Themes
 - **Classic**: Original, simple design (Recommended)
@@ -151,15 +153,18 @@ Right-click on items for quick actions:
 - Open file to the side
 
 **Bookmarks:**
-- Sort by line number or added order
 - Edit bookmark
 - Delete bookmark
 - Delete all bookmarks in file
 
 ### Drag and Drop
 - Drag files between folders to reorganize
-- Drag folders to create nested structures
+- Drag folders to create nested structures or reorder at the same level
+  - **Top 25% of folder header**: Insert before the target folder
+  - **Middle 50% of folder header**: Move into the target folder (change parent)
+  - **Bottom 25% of folder header**: Insert after the target folder
 - Drop files onto folders to move them
+- Folders can be moved across different hierarchy levels freely
 
 ### Opening Files
 - **Single Click**: Opens file in preview mode (if enabled)
@@ -229,7 +234,9 @@ VS Codeでお気に入りファイルとブックマークを管理するため�
 - **ブックマーク間の移動**: `Ctrl+Alt+Up/Down` (Mac: `Cmd+Alt+Up/Down`) で前後のブックマークにジャンプ
 - **自動調整**: コード変更時にブックマークが自動的に調整
 - **フィルタリング**: アイコンタイプでブックマークをフィルター
-- **ソート**: 行番号または追加順でソート
+- **ソート**: 「Bookmarks」セクションタイトル横の **Line / Order** ボタンで全ブックマークを一括ソート
+  - **Line**: 全ブックマークを行番号順にソート（新規追加時も行番号順の位置に挿入）
+  - **Order**: 全ブックマークを追加順にソート（新規追加時は末尾に追加）
 
 ### 🎨 4つの美しいテーマ
 - **Classic**: オリジナルのシンプルなデザイン（推奨）
@@ -355,15 +362,18 @@ VS Codeでお気に入りファイルとブックマークを管理するため�
 - ファイルを横に開く
 
 **ブックマーク:**
-- 行番号または追加順でソート
 - ブックマークを編集
 - ブックマークを削除
 - ファイル内のすべてのブックマークを削除
 
 ### ドラッグ&ドロップ
 - ファイルをフォルダ間でドラッグして整理
-- フォルダをドラッグしてネスト構造を作成
+- フォルダをドラッグしてネスト構造を作成、または同階層で並び替え
+  - **フォルダヘッダーの上25%**: 対象フォルダの前に挿入
+  - **フォルダヘッダーの中央50%**: 対象フォルダの中に移動（親を変更）
+  - **フォルダヘッダーの下25%**: 対象フォルダの後ろに挿入
 - ファイルをフォルダにドロップして移動
+- フォルダは異なる階層間でも自由に移動可能
 
 ### ファイルを開く
 - **シングルクリック**: プレビューモードでファイルを開く（有効な場合）

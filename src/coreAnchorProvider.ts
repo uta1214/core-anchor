@@ -111,6 +111,12 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         case 'moveFolderToFolder':
           await this.moveFolderToFolder(message.folderId, message.targetParentId);
           break;
+        case 'reorderFilesInFolder':
+          await this.reorderFilesInFolder(message.folderId, message.draggedFile, message.targetFile, message.position);
+          break;
+        case 'reorderFolders':
+          await this.reorderFolders(message.draggedFolderId, message.targetFolderId, message.position, message.parentId);
+          break;
         case 'editFavorite':
           await this.editFavorite(message.oldPath, message.newPath, message.description);
           break;
@@ -148,7 +154,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           await this.sortBookmarkFiles(message.sortType);
           break;
         case 'sortBookmarks':
-          await this.sortBookmarks(message.filePath, message.sortType);
+          await this.sortBookmarks(message.sortType);
           break;
         case 'reorderFavoriteFolders':
           await this.reorderFavoriteFolders(message.folders);
@@ -653,23 +659,23 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
   }
 
   // Bookmarks（ファイル内）をソート
-  private async sortBookmarks(filePath: string, sortType: SortType) {
+  private async sortBookmarks(sortType: SortType) {
     const bookmarks = this.loadBookmarks();
     const meta = this.loadBookmarksMeta();
     
-    if (!bookmarks[filePath]) return;
+    // 全ファイルのブックマークを一括ソート
+    Object.keys(bookmarks).forEach(filePath => {
+      if (sortType === 'line') {
+        bookmarks[filePath].sort((a, b) => a.line - b.line);
+      } else if (sortType === 'order') {
+        bookmarks[filePath].sort((a, b) => (a.order || 0) - (b.order || 0));
+      }
+    });
     
-    if (sortType === 'line') {
-      bookmarks[filePath].sort((a, b) => a.line - b.line);
-    } else if (sortType === 'order') {
-      bookmarks[filePath].sort((a, b) => (a.order || 0) - (b.order || 0));
-    }
-    
-    meta.bookmarkSortType[filePath] = sortType;
+    meta.globalSortType = sortType;
     this.saveBookmarks(bookmarks);
     this.saveBookmarksMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage('Bookmarks sorted');
   }
 
   // Favoriteフォルダを並び替え（ドラッグ&ドロップ）
@@ -1217,6 +1223,127 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     vscode.window.showInformationMessage(`Moved folder "${folder.name}" to "${targetFolderName}"`);
   }
 
+  // ファイル並び替え（同一フォルダ内）
+  private async reorderFilesInFolder(
+    folderId: string | null, 
+    draggedFile: string, 
+    targetFile: string, 
+    position: 'before' | 'after'
+  ) {
+    console.log('[Core Anchor Backend] reorderFilesInFolder:', { 
+      folderId, 
+      draggedFile, 
+      targetFile, 
+      position 
+    });
+
+    const meta = this.loadFavoritesMeta();
+    
+    // fileOrder を初期化（存在しない場合）
+    if (!meta.fileOrder) {
+      meta.fileOrder = {};
+    }
+    
+    const folderKey = folderId || '(root)';
+    
+    // 現在のファイル一覧を取得
+    const favorites = this.loadFavorites();
+    const filesInFolder = Object.keys(favorites).filter(path => {
+      const file = favorites[path];
+      const fileFolderId = file.virtualFolderId || null;
+      return fileFolderId === folderId;
+    });
+    
+    // 既存の並び順がある場合はそれを使用、なければ現在の順序
+    let fileOrder = meta.fileOrder[folderKey] || filesInFolder;
+    
+    // fileOrder から存在しないファイルを削除（クリーンアップ）
+    fileOrder = fileOrder.filter(f => filesInFolder.includes(f));
+    
+    // filesInFolder にあるが fileOrder にないファイルを末尾に追加
+    const missingFiles = filesInFolder.filter(f => !fileOrder.includes(f));
+    fileOrder = [...fileOrder, ...missingFiles];
+    
+    // draggedFile を削除
+    fileOrder = fileOrder.filter(f => f !== draggedFile);
+    
+    // targetFile の位置を探して挿入
+    const targetIndex = fileOrder.indexOf(targetFile);
+    if (targetIndex === -1) {
+      // targetFile が見つからない場合は末尾に追加
+      fileOrder.push(draggedFile);
+    } else {
+      const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      fileOrder.splice(insertIndex, 0, draggedFile);
+    }
+    
+    meta.fileOrder[folderKey] = fileOrder;
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    
+    console.log('[Core Anchor Backend] File reorder complete:', { folderKey, fileOrder });
+  }
+
+  // フォルダ並び替え（同一階層内）
+  private async reorderFolders(
+    draggedFolderId: string, 
+    targetFolderId: string, 
+    position: 'before' | 'after',
+    parentId: string | null
+  ) {
+    console.log('[Core Anchor Backend] reorderFolders:', { 
+      draggedFolderId, 
+      targetFolderId, 
+      position, 
+      parentId 
+    });
+
+    const meta = this.loadFavoritesMeta();
+    if (!meta.virtualFolders) {
+      return;
+    }
+    
+    // 同一親階層のフォルダを取得
+    const sameLevelFolders = meta.virtualFolders.filter(f => 
+      (f.parentId || null) === parentId
+    );
+    
+    // order でソート
+    sameLevelFolders.sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    // draggedFolder を削除
+    const draggedIndex = sameLevelFolders.findIndex(f => f.id === draggedFolderId);
+    if (draggedIndex === -1) {
+      console.log('[Core Anchor Backend] Dragged folder not found');
+      return;
+    }
+    const draggedFolder = sameLevelFolders.splice(draggedIndex, 1)[0];
+    
+    // targetFolder の位置を探して挿入
+    const targetIndex = sameLevelFolders.findIndex(f => f.id === targetFolderId);
+    if (targetIndex === -1) {
+      console.log('[Core Anchor Backend] Target folder not found');
+      return;
+    }
+    
+    const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+    sameLevelFolders.splice(insertIndex, 0, draggedFolder);
+    
+    // order を再割り当て
+    sameLevelFolders.forEach((folder, index) => {
+      folder.order = index;
+    });
+    
+    this.saveFavoritesMeta(meta);
+    this.refresh();
+    
+    console.log('[Core Anchor Backend] Folder reorder complete:', { 
+      parentId, 
+      folderOrder: sameLevelFolders.map(f => f.name) 
+    });
+  }
+
+
   // フォルダAがフォルダBの子孫かどうかチェック
   private isDescendant(folders: VirtualFolder[], checkId: string, ancestorId: string): boolean {
     const folder = folders.find(f => f.id === checkId);
@@ -1352,6 +1479,14 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       iconType: selectedIconType.value,
       order: maxOrder + 1
     });
+
+    // 現在のソートタイプに応じて自動ソート
+    const meta = this.loadBookmarksMeta();
+    const sortType = meta.globalSortType || 'line';
+    if (sortType === 'line') {
+      bookmarks[relativePath].sort((a, b) => a.line - b.line);
+    }
+    // 'order' の場合はpushしたまま（末尾=追加順）でOK
     
     this.saveBookmarks(bookmarks);
     this.refresh();
@@ -1620,6 +1755,14 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       iconType: (iconType as any) || 'default',
       order: maxOrder + 1
     });
+
+    // 現在のソートタイプに応じて自動ソート
+    const meta = this.loadBookmarksMeta();
+    const sortType = meta.globalSortType || 'line';
+    if (sortType === 'line') {
+      bookmarks[filePath].sort((a, b) => a.line - b.line);
+    }
+    // 'order' の場合はpushしたまま（末尾=追加順）でOK
     
     this.saveBookmarks(bookmarks);
     this.refresh();
@@ -1747,6 +1890,22 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       const position = new vscode.Position(line, 0);
       editor.selection = new vscode.Selection(position, position);
       editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+    }
+
+    // ハイライト通知
+    this.highlightBookmark(filePath, line);
+  }
+
+  // ブックマークをハイライト（public）
+  highlightBookmark(filePath: string, line: number) {
+    console.log('[Core Anchor Backend] Highlight bookmark:', { filePath, line });
+    
+    if (this._view) {
+      this._view.webview.postMessage({
+        command: 'setHighlightedBookmark',
+        filePath: filePath,
+        line: line
+      });
     }
   }
 
@@ -1891,6 +2050,11 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       const favoritesMeta = this.loadFavoritesMeta();
       const bookmarksMeta = this.loadBookmarksMeta();
       
+      // デバッグ: virtualFolders のIDを確認
+      console.log('[Core Anchor Backend] Virtual folders IDs:', 
+        favoritesMeta.virtualFolders?.map(f => ({ id: f.id, name: f.name })) || []
+      );
+      
       // ブックマークに行内容を追加
       const bookmarksWithContent: any = {};
       const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -1980,6 +2144,8 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       const config = vscode.workspace.getConfiguration('core-anchor');
       const defaultPathType = config.get<string>('favorites.defaultPathType', 'relative');
       const showBookmarkTooltip = config.get<boolean>('bookmarks.showTooltip', true);
+      const favoritesDefaultExpandState = config.get<string>('favorites.defaultExpandState', 'collapsed');
+      const bookmarksDefaultExpandState = config.get<string>('bookmarks.defaultExpandState', 'collapsed');
       
       this._view.webview.postMessage({
         command: 'update',
@@ -1990,7 +2156,10 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         fileIcons: fileIcons,
         settings: {
           defaultPathType: defaultPathType,
-          showBookmarkTooltip: showBookmarkTooltip
+          showBookmarkTooltip: showBookmarkTooltip,
+          favoritesDefaultExpandState: favoritesDefaultExpandState,
+          bookmarksDefaultExpandState: bookmarksDefaultExpandState,
+          bookmarksGlobalSortType: bookmarksMeta.globalSortType || 'line'
         }
       });
     }

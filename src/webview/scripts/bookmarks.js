@@ -5,6 +5,9 @@ let allBookmarksData = null;
 let selectedBookmarkIcon = 'default';
 const editIconSelects = new Map();
 let currentIconFilter = '';
+let highlightedBookmark = null; // { filePath, line } - ハイライト中のブックマーク
+let bookmarksDefaultExpandState = 'collapsed'; // 初期開閉状態
+let globalBookmarkSortType = 'line'; // グローバルソートタイプ
 
 function toggleBookmarkForm() {
   const form = document.getElementById('bookmarkForm');
@@ -92,8 +95,11 @@ function removeBookmark(filePath, line) {
   vscode.postMessage({ command: 'removeBookmark', filePath, line }); 
 }
 
-function jumpToBookmark(filePath, line) { 
-  vscode.postMessage({ command: 'jumpToBookmark', filePath, line }); 
+function jumpToBookmark(filePath, line) {
+  // ハイライトを設定（バックエンドからの通知を待たずに先行設定）
+  highlightedBookmark = { filePath, line };
+  console.log('[Core Anchor] Jump to bookmark:', { filePath, line });
+  vscode.postMessage({ command: 'jumpToBookmark', filePath, line });
 }
 
 function toggleFileGroup(fileId) {
@@ -115,6 +121,20 @@ function toggleFileGroup(fileId) {
     items.style.display = 'block';
   }
   saveState();
+}
+
+// グローバルソートタイプを切り替える
+function setSortType(sortType) {
+  globalBookmarkSortType = sortType;
+  vscode.postMessage({ command: 'sortBookmarks', sortType });
+  updateGlobalSortButtons();
+}
+
+function updateGlobalSortButtons() {
+  const btnLine = document.getElementById('globalSortBtnLine');
+  const btnOrder = document.getElementById('globalSortBtnOrder');
+  if (btnLine) btnLine.classList.toggle('sort-btn-active', globalBookmarkSortType === 'line');
+  if (btnOrder) btnOrder.classList.toggle('sort-btn-active', globalBookmarkSortType === 'order');
 }
 
 function filterBookmarks() {
@@ -182,29 +202,60 @@ function updateBookmarks(bookmarks) {
   }
   
   container.innerHTML = '';
+  
+  // 初回判定（expandedFilesが空 = まだユーザーが手動で開閉していない）
+  const isFirstRender = expandedFiles.size === 0;
+  
   files.forEach(filePath => {
     const marks = bookmarks[filePath];
     const fileId = safeId(filePath);
-    const isExpanded = expandedFiles.has(fileId);
+    
+    // 初回かつ設定が expanded の場合は全て展開
+    let isExpanded = expandedFiles.has(fileId);
+    if (isFirstRender && bookmarksDefaultExpandState === 'expanded') {
+      isExpanded = true;
+      expandedFiles.add(fileId);
+    }
+    
     const fileDiv = document.createElement('div');
     fileDiv.className = 'file-group';
-    
+
     const headerDiv = document.createElement('div');
     headerDiv.className = 'file-header';
     headerDiv.onclick = () => toggleFileGroup(fileId);
     headerDiv.oncontextmenu = (e) => showContextMenu(e, [
-      { label: 'Sort by Line Number', action: () => vscode.postMessage({ command: 'sortBookmarks', filePath, sortType: 'line' }) },
-      { label: 'Sort by Added Order', action: () => vscode.postMessage({ command: 'sortBookmarks', filePath, sortType: 'order' }) },
-      { separator: true },
       { label: 'Delete All Bookmarks', action: () => vscode.postMessage({ command: 'deleteAllBookmarks', filePath }) },
     ]);
-    
+
+    // 展開アイコン
+    const expandSpan = document.createElement('span');
+    expandSpan.id = 'fileicon-' + fileId;
+    expandSpan.className = 'file-icon' + (isExpanded ? ' expanded' : '');
+    expandSpan.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:16px;transition:transform 0.2s;' + (isExpanded ? 'transform:rotate(90deg);' : '');
+    expandSpan.innerHTML = EXPAND_ICON;
+
+    // ファイル名
     const fileIconSrc = fileIcons[filePath] || '';
-    const fileIconHtml = fileIconSrc ? '<img src="' + fileIconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" />' : '📄 ';
-    
-    const expandIconHtml = '<span id="fileicon-' + fileId + '" class="file-icon' + (isExpanded ? ' expanded' : '') + '" style="display:inline-flex;align-items:center;justify-content:center;width:16px;transition:transform 0.2s;' + (isExpanded ? 'transform:rotate(90deg);' : '') + '">' + EXPAND_ICON + '</span>';
-    
-    headerDiv.innerHTML = expandIconHtml + '<span class="file-name">' + fileIconHtml + escapeHtml(filePath) + '</span><span class="file-count">' + marks.length + '</span>';
+    const fileNameSpan = document.createElement('span');
+    fileNameSpan.className = 'file-name';
+    if (fileIconSrc) {
+      const img = document.createElement('img');
+      img.src = fileIconSrc;
+      img.style.cssText = 'width:14px;height:14px;vertical-align:middle;margin-right:4px;';
+      fileNameSpan.appendChild(img);
+    } else {
+      fileNameSpan.appendChild(document.createTextNode('📄 '));
+    }
+    fileNameSpan.appendChild(document.createTextNode(filePath));
+
+    // バッジ（件数）
+    const countSpan = document.createElement('span');
+    countSpan.className = 'file-count';
+    countSpan.textContent = marks.length;
+
+    headerDiv.appendChild(expandSpan);
+    headerDiv.appendChild(fileNameSpan);
+    headerDiv.appendChild(countSpan);
     
     const itemsDiv = document.createElement('div');
     itemsDiv.id = 'fileitems-' + fileId;
@@ -225,6 +276,11 @@ function updateBookmarks(bookmarks) {
       
       const itemDiv = document.createElement('div');
       itemDiv.className = 'item';
+      
+      // ハイライト判定
+      if (highlightedBookmark && highlightedBookmark.filePath === filePath && highlightedBookmark.line === mark.line) {
+        itemDiv.classList.add('bm-highlighted');
+      }
       
       // item-contentを作成
       const itemContent = document.createElement('div');

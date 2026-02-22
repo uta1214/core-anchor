@@ -49,5 +49,6 @@ export interface FavoritesMeta {
 
 export interface BookmarksMeta {
   fileOrder: string[]; // ファイルの順序
-  bookmarkSortType: { [filePath: string]: SortType }; // ファイルごとのソートタイプ
+  bookmarkSortType: { [filePath: string]: SortType }; // 旧: ファイルごとのソートタイプ（後方互換のため残す）
+  globalSortType?: SortType; // 全ブックマーク共通のソートタイプ
 }

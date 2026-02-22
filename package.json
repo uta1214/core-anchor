@@ -220,6 +220,26 @@
           "type": "boolean",
           "default": true,
           "description": "Show bookmark details on hover (line number and description). Shortcut key tooltip is always visible. / ホバー時にブックマークの詳細を表示（行番号と説明）。ショートカットキーのツールチップは常に表示されます。"
+        },
+        "core-anchor.favorites.defaultExpandState": {
+          "type": "string",
+          "default": "collapsed",
+          "enum": ["collapsed", "expanded"],
+          "enumDescriptions": [
+            "All folders collapsed by default / デフォルトで全フォルダを閉じる",
+            "All folders expanded by default / デフォルトで全フォルダを展開"
+          ],
+          "description": "Default expand state for favorite folders when opening workspace / ワークスペースを開いたときのお気に入りフォルダの初期開閉状態"
+        },
+        "core-anchor.bookmarks.defaultExpandState": {
+          "type": "string",
+          "default": "collapsed",
+          "enum": ["collapsed", "expanded"],
+          "enumDescriptions": [
+            "All files collapsed by default / デフォルトで全ファイルを閉じる",
+            "All files expanded by default / デフォルトで全ファイルを展開"
+          ],
+          "description": "Default expand state for bookmark files when opening workspace / ワークスペースを開いたときのブックマークファイルの初期開閉状態"
         }
       }
     }

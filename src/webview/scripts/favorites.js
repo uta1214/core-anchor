@@ -5,13 +5,21 @@ let allFavoritesData = null;
 let virtualFolders = [];
 let selectedVirtualFolderId = null;
 let draggedFile = null;
-let draggedFromFolderId = null;
+let draggedFromFolderId = null;   // ファイル用: 元のフォルダID
 let draggedFolder = null;
+let draggedFolderParentId = null; // フォルダ用: ドラッグ元の親ID
+let currentDragMode = null; // 'before' | 'after' | 'into'
+let dragOverTarget = null; // 現在ドラッグオーバーしている要素
+let insertPosition = null; // 'before' | 'after'
+// flickering防止用: 前回のプレースホルダー状態
+let lastPlaceholderTarget = null;
+let lastPlaceholderPosition = null;
 let editingFolderId = null;
 let creatingSubfolderForId = null;
 let currentColorPickerFolderId = null; // カラーピッカーのトグル用
 let selectedItemPath = null;  // F2キー用
 let selectedFolderId = null;   // F2キー用
+let favoritesDefaultExpandState = 'collapsed'; // 初期開閉状態
 
 // 🔧 FIX: トグル機能のための変数
 let currentAddFilePopupFolderId = null;
@@ -307,7 +315,20 @@ function updateFavorites(favorites) {
   
   container.innerHTML = '';
   
-  const rootFolders = virtualFolders.filter(f => !f.parentId);
+  // 初回判定（expandedFoldersが空 = まだユーザーが手動で開閉していない）
+  const isFirstRender = expandedFolders.size === 0;
+  const expandState = window.favoritesDefaultExpandState || favoritesDefaultExpandState;
+  if (isFirstRender && expandState === 'expanded') {
+    // 全フォルダを展開状態にする
+    virtualFolders.forEach(folder => {
+      const folderId = safeId('vf-' + folder.id);
+      expandedFolders.add(folderId);
+    });
+  }
+  
+  const rootFolders = virtualFolders
+    .filter(f => !f.parentId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
   
   rootFolders.forEach(folder => {
     const files = folderFiles[folder.id] || {};
@@ -336,10 +357,7 @@ function renderVirtualFolder(folder, files, container, depth = 0, allFolderFiles
   folderDiv.setAttribute('data-folder-id', folder.id);
   folderDiv.style.marginLeft = (depth * 16) + 'px';
   
-  folderDiv.draggable = true;
-  folderDiv.addEventListener('dragstart', (e) => handleFolderDragStart(e, folder.id, folder.parentId));
-  folderDiv.addEventListener('dragend', handleFolderDragEnd);
-  
+  // Drop イベントのみ（draggable は dragHandle に移動）
   folderDiv.addEventListener('dragover', handleFolderDragOver);
   folderDiv.addEventListener('dragleave', handleFolderDragLeave);
   folderDiv.addEventListener('drop', (e) => handleFolderDrop(e, folder.id));
@@ -402,13 +420,41 @@ function renderVirtualFolder(folder, files, container, depth = 0, allFolderFiles
     setTimeout(() => input.focus(), 0);
   }
   
-  childFolders.forEach(childFolder => {
+  // 子フォルダを order でソート
+  const sortedChildFolders = childFolders.sort((a, b) => (a.order || 0) - (b.order || 0));
+  
+  sortedChildFolders.forEach(childFolder => {
     const childFiles = allFolderFiles[childFolder.id] || {};
     renderVirtualFolder(childFolder, childFiles, itemsDiv, depth + 1, allFolderFiles);
   });
   
-  Object.entries(files).forEach(([path, data]) => {
-    renderFavoriteFile(path, data, itemsDiv, folder.id);
+  // ファイルを fileOrder でソート
+  const folderKey = folder.id;
+  let fileOrder = (window.favoritesMeta && window.favoritesMeta.fileOrder && window.favoritesMeta.fileOrder[folderKey]) || Object.keys(files);
+  
+  // fileOrder から存在しないファイルを削除（クリーンアップ）
+  fileOrder = fileOrder.filter(path => files[path]);
+  
+  console.log('[Core Anchor] Render folder files:', {
+    folderId: folder.id,
+    folderName: folder.name,
+    filesInFolder: Object.keys(files),
+    fileOrder: fileOrder,
+    hasFileOrder: !!(window.favoritesMeta && window.favoritesMeta.fileOrder && window.favoritesMeta.fileOrder[folderKey])
+  });
+  
+  // fileOrder に存在するファイルを順番通りにレンダリング
+  fileOrder.forEach(path => {
+    if (files[path]) {
+      renderFavoriteFile(path, files[path], itemsDiv, folder.id);
+    }
+  });
+  
+  // fileOrder に含まれていない新しいファイルがあれば末尾に追加
+  Object.keys(files).forEach(path => {
+    if (!fileOrder.includes(path)) {
+      renderFavoriteFile(path, files[path], itemsDiv, folder.id);
+    }
   });
   
   folderDiv.appendChild(headerDiv);
@@ -464,16 +510,25 @@ function renderFolderNormalMode(headerDiv, folder, folderId, totalCount, isExpan
     buttonsSpan.style.opacity = '0';
   });
   
-  // クリックで選択状態にする + トグル
+  // draggable設定（シンプル版）
+  headerDiv.draggable = true;
+  
+  headerDiv.addEventListener('dragstart', (e) => {
+    // ボタンエリアからのドラッグは無視
+    if (e.target.closest('.folder-buttons')) {
+      e.preventDefault();
+      return;
+    }
+    handleFolderDragStart(e, folder.id, folder.parentId);
+  });
+  
+  headerDiv.addEventListener('dragend', (e) => {
+    handleFolderDragEnd(e);
+  });
+  
+  // クリックでトグル
   headerDiv.addEventListener('click', (e) => {
     if (!e.target.closest('.folder-buttons')) {
-      selectedFolderId = folder.id;
-      selectedItemPath = null;
-      
-      document.querySelectorAll('.folder-header').forEach(el => el.classList.remove('selected'));
-      document.querySelectorAll('.item').forEach(el => el.classList.remove('selected'));
-      headerDiv.classList.add('selected');
-      
       toggleFolder(folderId);
     }
   });
@@ -950,8 +1005,25 @@ function renderRootFiles(files, container) {
   itemsDiv.className = 'folder-items' + (isExpanded ? ' expanded' : '');
   itemsDiv.style.display = isExpanded ? 'block' : 'none';
   
-  Object.entries(files).forEach(([path, data]) => {
-    renderFavoriteFile(path, data, itemsDiv, null);
+  // ファイルを fileOrder でソート
+  const folderKey = '(root)';
+  let fileOrder = (window.favoritesMeta && window.favoritesMeta.fileOrder && window.favoritesMeta.fileOrder[folderKey]) || Object.keys(files);
+  
+  // fileOrder から存在しないファイルを削除（クリーンアップ）
+  fileOrder = fileOrder.filter(path => files[path]);
+  
+  // fileOrder に存在するファイルを順番通りにレンダリング
+  fileOrder.forEach(path => {
+    if (files[path]) {
+      renderFavoriteFile(path, files[path], itemsDiv, null);
+    }
+  });
+  
+  // fileOrder に含まれていない新しいファイルがあれば末尾に追加
+  Object.keys(files).forEach(path => {
+    if (!fileOrder.includes(path)) {
+      renderFavoriteFile(path, files[path], itemsDiv, null);
+    }
   });
   
   uncategorizedDiv.appendChild(headerDiv);
@@ -966,6 +1038,9 @@ function renderFavoriteFile(path, data, container, folderId) {
   
   itemDiv.addEventListener('dragstart', (e) => handleFileDragStart(e, path, folderId));
   itemDiv.addEventListener('dragend', handleFileDragEnd);
+  itemDiv.addEventListener('dragover', (e) => handleFileDragOver(e, path, folderId));
+  itemDiv.addEventListener('dragleave', handleFileDragLeave);
+  itemDiv.addEventListener('drop', (e) => handleFileDrop(e, path, folderId));
   
   const fileName = getDisplayFileName(path, allFavoritesData); // 🔧 FIX: 同名ファイル対応
   const fileIconSrc = fileIcons[path] || '';
@@ -1071,11 +1146,53 @@ function renderFavoriteFile(path, data, container, folderId) {
 }
 
 // ドラッグ&ドロップハンドラー
+
+// プレースホルダー表示（並び替え用）
+// DOM挿入をやめてborderスタイルで表現（DOM変更による位置ズレ・flickeringを根本解消）
+function showPlaceholder(position, element) {
+  if (lastPlaceholderTarget === element && lastPlaceholderPosition === position) return;
+  
+  clearPlaceholderStyle();
+  
+  const header = element.querySelector('.folder-header') || element;
+  const borderStyle = '2px solid var(--vscode-focusBorder)';
+  if (position === 'before') {
+    header.style.borderTop = borderStyle;
+    header.style.borderBottom = '';
+  } else {
+    header.style.borderTop = '';
+    header.style.borderBottom = borderStyle;
+  }
+  
+  dragOverTarget = element;
+  insertPosition = position;
+  lastPlaceholderTarget = element;
+  lastPlaceholderPosition = position;
+}
+
+function clearPlaceholderStyle() {
+  document.querySelectorAll('.folder-group').forEach(el => {
+    const header = el.querySelector('.folder-header') || el;
+    header.style.borderTop = '';
+    header.style.borderBottom = '';
+  });
+}
+
+function removePlaceholder() {
+  clearPlaceholderStyle();
+  dragOverTarget = null;
+  insertPosition = null;
+  lastPlaceholderTarget = null;
+  lastPlaceholderPosition = null;
+}
+
 function handleFileDragStart(e, filePath, fromFolderId) {
   e.stopPropagation(); // 親要素への伝播を防ぐ（重要！）
   draggedFile = filePath;
   draggedFolder = null; // フォルダドラッグをリセット
+  draggedFolderParentId = null;
   draggedFromFolderId = fromFolderId;
+  currentDragMode = null;
   e.currentTarget.style.opacity = '0.5';
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', filePath);
@@ -1085,26 +1202,93 @@ function handleFileDragEnd(e) {
   e.currentTarget.style.opacity = '1';
   draggedFile = null;
   draggedFromFolderId = null;
+  removePlaceholder();
 }
 
+// ファイル要素上でのdragover（並び替え用）
+function handleFileDragOver(e, targetPath, targetFolderId) {
+  if (!draggedFile) return; // ファイルドラッグ中のみ
+  if (draggedFile === targetPath) return; // 自分自身は無視
+  
+  // 同一フォルダ内の場合のみ並び替え処理
+  if (draggedFromFolderId === targetFolderId) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // 上半分か下半分かで判定
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midPoint = rect.top + rect.height / 2;
+    const position = e.clientY < midPoint ? 'before' : 'after';
+    
+    showPlaceholder(position, e.currentTarget);
+    e.dataTransfer.dropEffect = 'move';
+  }
+  // 異なるフォルダの場合はイベントを伝播させて、フォルダヘッダーが処理できるようにする
+}
+
+function handleFileDragLeave(e) {
+  // 要素から完全に離れた場合のみクリア
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    removePlaceholder();
+  }
+}
+
+function handleFileDrop(e, targetPath, targetFolderId) {
+  if (!draggedFile) return;
+  if (draggedFile === targetPath) return;
+  
+  // 同一フォルダ内の場合のみ並び替え処理
+  if (draggedFromFolderId === targetFolderId) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    vscode.postMessage({
+      command: 'reorderFilesInFolder',
+      folderId: targetFolderId,
+      draggedFile: draggedFile,
+      targetFile: targetPath,
+      position: insertPosition
+    });
+    
+    removePlaceholder();
+  }
+  // 異なるフォルダの場合はイベントを伝播させて、フォルダヘッダーが処理する
+}
+
+
 function handleFolderDragStart(e, folderId, parentId) {
-  e.stopPropagation(); // 最初に呼ぶ
+  e.stopPropagation();
   draggedFolder = folderId;
-  draggedFile = null; // ファイルドラッグをリセット
-  draggedFromFolderId = parentId || null; // 親フォルダIDを保存
-  e.currentTarget.classList.add('dragging');
+  draggedFile = null;
+  draggedFolderParentId = parentId || null;
+  draggedFromFolderId = null; // ファイル用変数はリセット
+  currentDragMode = null;
+  
+  // ドラッグ中のフォルダを半透明に
+  const folderElement = document.querySelector(`[data-folder-id="${folderId}"]`);
+  if (folderElement) {
+    folderElement.style.opacity = '0.4';
+  }
+  
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', folderId);
 }
 
 function handleFolderDragEnd(e) {
-  e.currentTarget.classList.remove('dragging');
+  if (draggedFolder) {
+    const folderElement = document.querySelector(`[data-folder-id="${draggedFolder}"]`);
+    if (folderElement) folderElement.style.opacity = '1';
+  }
   
   document.querySelectorAll('.folder-group').forEach(folder => {
     folder.classList.remove('drag-over');
   });
+  clearPlaceholderStyle();
   
   draggedFolder = null;
+  draggedFolderParentId = null;
+  currentDragMode = null;
+  removePlaceholder();
 }
 
 function handleFolderDragOver(e) {
@@ -1115,29 +1299,68 @@ function handleFolderDragOver(e) {
   const targetFolderId = folderGroup.getAttribute('data-folder-id');
   const actualTargetId = targetFolderId === 'null' ? null : targetFolderId;
   
+  // ファイルをフォルダに移動（既存機能）
   if (draggedFile && !draggedFolder) {
     if (actualTargetId === draggedFromFolderId) {
       e.dataTransfer.dropEffect = 'none';
       return;
     }
     e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.folder-group').forEach(f => f.classList.remove('drag-over'));
     folderGroup.classList.add('drag-over');
+    return;
   }
   
+  // フォルダをドラッグ中
   if (draggedFolder && !draggedFile) {
+    // 自分自身はスキップ
     if (actualTargetId === draggedFolder) {
       e.dataTransfer.dropEffect = 'none';
+      removePlaceholder();
+      document.querySelectorAll('.folder-group').forEach(f => f.classList.remove('drag-over'));
       return;
     }
-    e.dataTransfer.dropEffect = 'move';
-    folderGroup.classList.add('drag-over');
+    
+    // folder-header の rect でカーソル位置を判定（子要素の影響を受けない）
+    const headerEl = folderGroup.querySelector('.folder-header');
+    const rect = (headerEl || folderGroup).getBoundingClientRect();
+    const relY = e.clientY - rect.top;
+    const zoneSize = rect.height * 0.25;
+    
+    if (relY < zoneSize) {
+      // 上25%: 前に挿入
+      document.querySelectorAll('.folder-group').forEach(f => f.classList.remove('drag-over'));
+      currentDragMode = 'before';
+      showPlaceholder('before', folderGroup);
+      e.dataTransfer.dropEffect = 'move';
+    } else if (relY > rect.height - zoneSize) {
+      // 下25%: 後ろに挿入
+      document.querySelectorAll('.folder-group').forEach(f => f.classList.remove('drag-over'));
+      currentDragMode = 'after';
+      showPlaceholder('after', folderGroup);
+      e.dataTransfer.dropEffect = 'move';
+    } else {
+      // 中央50%: フォルダ内に移動
+      if (currentDragMode !== 'into' || lastPlaceholderTarget !== null) {
+        clearPlaceholderStyle();
+        document.querySelectorAll('.folder-group').forEach(f => f.classList.remove('drag-over'));
+        folderGroup.classList.add('drag-over');
+        currentDragMode = 'into';
+        lastPlaceholderTarget = null;
+        lastPlaceholderPosition = null;
+      }
+      e.dataTransfer.dropEffect = 'move';
+    }
   }
 }
 
 function handleFolderDragLeave(e) {
   const folderGroup = e.currentTarget;
-  if (!folderGroup.contains(e.relatedTarget)) {
+  const related = e.relatedTarget;
+  
+  if (!folderGroup.contains(related)) {
     folderGroup.classList.remove('drag-over');
+    // border はそのまま維持（他の folderGroup に移った時に clearPlaceholderStyle で一括クリア）
   }
 }
 
@@ -1148,33 +1371,56 @@ function handleFolderDrop(e, targetFolderId) {
   const folderGroup = e.currentTarget;
   folderGroup.classList.remove('drag-over');
   
+  // ファイルをフォルダに移動
   if (draggedFile && !draggedFolder) {
-    if (targetFolderId === draggedFromFolderId) {
-      return;
-    }
-    
+    if (targetFolderId === draggedFromFolderId) return;
     vscode.postMessage({
       command: 'moveFileToFolder',
       filePath: draggedFile,
       targetFolderId: targetFolderId
     });
+    return;
   }
   
+  // フォルダ操作
   if (draggedFolder && !draggedFile) {
-    if (targetFolderId === draggedFolder) {
-      return;
+    if (targetFolderId === draggedFolder) return;
+
+    // drop時点でcursor位置を再計算してmodeを確定（dragoverの最終値が古い場合への保険）
+    const headerEl = folderGroup.querySelector('.folder-header');
+    const rect = (headerEl || folderGroup).getBoundingClientRect();
+    const relY = e.clientY - rect.top;
+    const zoneSize = rect.height * 0.25;
+    let resolvedMode;
+    if (relY < zoneSize) {
+      resolvedMode = 'before';
+    } else if (relY > rect.height - zoneSize) {
+      resolvedMode = 'after';
+    } else {
+      resolvedMode = 'into';
+    }
+
+    if (resolvedMode === 'into') {
+      if (targetFolderId === draggedFolderParentId) return;
+      vscode.postMessage({
+        command: 'moveFolderToFolder',
+        folderId: draggedFolder,
+        targetParentId: targetFolderId
+      });
+    } else {
+      // before / after: 並び替え
+      const targetFolder = virtualFolders.find(f => f.id === targetFolderId);
+      const targetParentId = targetFolder ? (targetFolder.parentId || null) : null;
+      vscode.postMessage({
+        command: 'reorderFolders',
+        draggedFolderId: draggedFolder,
+        targetFolderId: targetFolderId,
+        position: resolvedMode,
+        parentId: targetParentId
+      });
     }
     
-    // 既に同じ親フォルダにいる場合はスキップ
-    if (targetFolderId === draggedFromFolderId) {
-      return;
-    }
-    
-    vscode.postMessage({
-      command: 'moveFolderToFolder',
-      folderId: draggedFolder,
-      targetParentId: targetFolderId
-    });
+    removePlaceholder();
   }
 }
 

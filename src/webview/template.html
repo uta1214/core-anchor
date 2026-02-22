@@ -40,7 +40,7 @@
       
       <div class="add-btn-container">
         <button class="toggle-add-btn quick-add-btn" onclick="addFileWithContext()">+ Add File</button>
-        <button class="toggle-add-btn" onclick="toggleVirtualFolderForm()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 4px;"><path d="M1.5 3H6.5L8 5H14.5V13H1.5V3Z" stroke="currentColor" stroke-width="1.5"/></svg>New Folder</button>
+        <button class="toggle-add-btn outline-btn" onclick="toggleVirtualFolderForm()"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 4px;"><path d="M1.5 3H6.5L8 5H14.5V13H1.5V3Z" stroke="currentColor" stroke-width="1.5"/></svg>New Folder</button>
       </div>
       
       <!-- Virtual Folder Form -->
@@ -86,17 +86,9 @@
         <span class="section-collapse-icon" id="bookmarksCollapseIcon">▼</span>
         <span class="section-title">Bookmarks</span>
       </div>
-      <div class="icon-filter">
-        <div class="custom-select" id="iconFilterSelect" style="width: 120px;" onclick="event.stopPropagation();">
-          <div class="custom-select-trigger" onclick="toggleIconSelect('iconFilterSelect')">
-            <div class="custom-select-value">
-              <img class="custom-select-icon" id="iconFilterSelectImage" src="" />
-              <span id="iconFilterSelectText">All Icons</span>
-            </div>
-            <span class="custom-select-arrow">∨</span>
-          </div>
-          <div class="custom-select-options" id="iconFilterSelectOptions"></div>
-        </div>
+      <div style="display:flex;gap:2px;flex-shrink:0;" onclick="event.stopPropagation();">
+        <button id="globalSortBtnLine" class="sort-btn sort-btn-active" title="Sort all bookmarks by line number" onclick="setSortType('line')">Line</button>
+        <button id="globalSortBtnOrder" class="sort-btn" title="Sort all bookmarks by added order" onclick="setSortType('order')">Order</button>
       </div>
     </div>
     <div class="section-content" id="bookmarksContent">
@@ -104,9 +96,21 @@
         <input type="text" id="bookmarkSearch" class="search-input" placeholder="Search bookmarks..." oninput="filterBookmarks()" />
       </div>
       <div class="debug-info" id="bookmarkDebug">Waiting...</div>
+      <div class="icon-filter" style="margin-bottom:4px; display:flex; justify-content:flex-end;">
+        <div class="custom-select" id="iconFilterSelect" style="width:auto;" onclick="event.stopPropagation();">
+          <div class="custom-select-trigger" style="gap:8px;" onclick="toggleIconSelect('iconFilterSelect')">
+            <div class="custom-select-value">
+              <img class="custom-select-icon" id="iconFilterSelectImage" src="" />
+              <span id="iconFilterSelectText">All Icons</span>
+            </div>
+            <span class="custom-select-arrow">∨</span>
+          </div>
+          <div class="custom-select-options" id="iconFilterSelectOptions" style="min-width:150px; right:0; left:auto;"></div>
+        </div>
+      </div>
       <div id="bookmarks"></div>
       <div class="add-btn-container">
-        <button class="toggle-add-btn" onclick="toggleBookmarkForm()">+ Add Bookmark</button>
+        <button class="toggle-add-btn quick-add-btn" onclick="toggleBookmarkForm()">+ Add Bookmark</button>
       </div>
       <div class="add-form" id="bookmarkForm">
         <input type="text" id="bookmarkFile" placeholder="File path" />
