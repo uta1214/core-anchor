@@ -40,6 +40,14 @@ const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const coreAnchorProvider_1 = require("./coreAnchorProvider");
 const decorationTypes = new Map();
+// ③ notifications.show 設定に従って情報通知を表示するヘルパー
+// エラーメッセージ (showErrorMessage) は設定に関わらず常に表示する
+function showInfo(message) {
+    const config = vscode.workspace.getConfiguration('core-anchor');
+    if (config.get('notifications.show', true)) {
+        showInfo(message);
+    }
+}
 // カスタムアイコンパスを取得する関数
 function getIconPath(context, iconType) {
     const config = vscode.workspace.getConfiguration('core-anchor');
@@ -139,7 +147,7 @@ function activate(context) {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             provider.updateDecorations(editor);
-            vscode.window.showInformationMessage('Core Anchor: Decorations refreshed');
+            showInfo('Core Anchor: Decorations refreshed');
         }
         else {
             vscode.window.showWarningMessage('Core Anchor: No active editor');
@@ -158,10 +166,13 @@ function activate(context) {
         const bookmarks = loadBookmarks();
         const fileBookmarks = bookmarks[relativePath] || [];
         if (fileBookmarks.length === 0) {
-            vscode.window.showInformationMessage('No bookmarks in this file');
+            showInfo('No bookmarks in this file');
             return;
         }
         const currentLine = editor.selection.active.line;
+        // ② navigation.wrap 設定を読み取る
+        const navConfig = vscode.workspace.getConfiguration('core-anchor');
+        const wrap = navConfig.get('bookmarks.navigation.wrap', true);
         // 現在行より前のブックマークを探す（降順にソート）
         const previousBookmarks = fileBookmarks
             .filter(bm => bm.line < currentLine)
@@ -170,9 +181,13 @@ function activate(context) {
         if (previousBookmarks.length > 0) {
             targetBookmark = previousBookmarks[0];
         }
-        else {
+        else if (wrap) {
             // 前のブックマークがない場合は最後のブックマークにループ
             targetBookmark = fileBookmarks.sort((a, b) => b.line - a.line)[0];
+        }
+        else {
+            showInfo('Already at the first bookmark');
+            return;
         }
         console.log('[Core Anchor] Jump to previous bookmark:', {
             currentLine,
@@ -185,7 +200,7 @@ function activate(context) {
         editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
         // ハイライト
         provider.highlightBookmark(relativePath, targetBookmark.line);
-        vscode.window.showInformationMessage(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
+        showInfo(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
     }));
     context.subscriptions.push(vscode.commands.registerCommand('core-anchor.goToNextBookmark', () => {
         console.log('[Core Anchor] Go to next bookmark command');
@@ -196,10 +211,13 @@ function activate(context) {
         const bookmarks = loadBookmarks();
         const fileBookmarks = bookmarks[relativePath] || [];
         if (fileBookmarks.length === 0) {
-            vscode.window.showInformationMessage('No bookmarks in this file');
+            showInfo('No bookmarks in this file');
             return;
         }
         const currentLine = editor.selection.active.line;
+        // ② navigation.wrap 設定を読み取る
+        const navConfig = vscode.workspace.getConfiguration('core-anchor');
+        const wrap = navConfig.get('bookmarks.navigation.wrap', true);
         // 現在行より後のブックマークを探す（昇順にソート）
         const nextBookmarks = fileBookmarks
             .filter(bm => bm.line > currentLine)
@@ -208,9 +226,13 @@ function activate(context) {
         if (nextBookmarks.length > 0) {
             targetBookmark = nextBookmarks[0];
         }
-        else {
+        else if (wrap) {
             // 次のブックマークがない場合は最初のブックマークにループ
             targetBookmark = fileBookmarks.sort((a, b) => a.line - b.line)[0];
+        }
+        else {
+            showInfo('Already at the last bookmark');
+            return;
         }
         console.log('[Core Anchor] Jump to next bookmark:', {
             currentLine,
@@ -223,7 +245,7 @@ function activate(context) {
         editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
         // ハイライト
         provider.highlightBookmark(relativePath, targetBookmark.line);
-        vscode.window.showInformationMessage(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
+        showInfo(`Bookmark: ${targetBookmark.label || 'Line ' + (targetBookmark.line + 1)}`);
     }));
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor((editor) => {
         if (editor) {
@@ -287,7 +309,25 @@ function activate(context) {
                 //   ブックマークを削除しない（後の shift で位置を調整する）。
                 //   Ctrl+Shift+K は startChar === 0 なので行結合ではない。
                 const isLineJoin = endChar === 0 && startChar > 0 && newText === '';
-                if (!isLineJoin) {
+                if (isLineJoin) {
+                    // ── 行結合 (Backspace / Delete) の場合 ──────────────────────────────
+                    // 「吸収される側の行 (endLine)」はコードごと消えるため、
+                    // そこに置かれたブックマークも削除する。
+                    //
+                    // 例1) Backspace: 行N-1末尾 → start:(N-1, len>0) end:(N, 0)
+                    //      → endLine = N が吸収される → 行N のBMを削除
+                    // 例2) Delete:   行N末尾   → start:(N, len>0) end:(N+1, 0)
+                    //      → endLine = N+1 が吸収される → 行N+1 のBMを削除
+                    //
+                    // この削除を行わないと、後続の ② シフトで行N+1 → 行N 等に移動し、
+                    // startLine 側に既存のBMがあれば同一行に2つBMが重複するバグが発生する。
+                    const before = bookmarks[relativePath].length;
+                    bookmarks[relativePath] = bookmarks[relativePath].filter(bm => bm.line !== endLine);
+                    if (bookmarks[relativePath].length !== before) {
+                        needsUpdate = true;
+                    }
+                }
+                else {
                     const before = bookmarks[relativePath].length;
                     bookmarks[relativePath] = bookmarks[relativePath].filter(bm => {
                         if (bm.line < startLine)

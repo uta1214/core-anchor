@@ -348,6 +348,48 @@ window.addEventListener('message', event => {
         }
       }, 50);
     }
+  } else if (msg.command === 'openAddBookmarkForm') {
+    // ブックマーク追加フォームを開き、ファイルパスとカーソル行をプリフィル
+    const form = document.getElementById('bookmarkForm');
+    const fileInput = document.getElementById('bookmarkFile');
+    const lineInput = document.getElementById('bookmarkLine');
+    const labelInput = document.getElementById('bookmarkLabel');
+
+    if (form && fileInput && lineInput) {
+      // 他の開いているフォーム・編集フォームを閉じる
+      document.querySelectorAll('.add-form.active').forEach(f => {
+        if (f.id !== 'bookmarkForm') f.classList.remove('active');
+      });
+      document.querySelectorAll('.edit-form.active').forEach(f => f.classList.remove('active'));
+
+      // 値をセット
+      fileInput.value = msg.filePath || '';
+      lineInput.value = msg.lineNumber != null ? String(msg.lineNumber) : '';
+
+      // フォームを開く
+      form.classList.add('active');
+
+      // フォームをスクロール
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+      });
+
+      // フォーカスを設定:
+      //   ファイルパスも行番号もプリフィルされている → ラベル入力欄へ
+      //   ファイルパスのみ → 行番号入力欄へ
+      //   どちらも空 → ファイルパス入力欄へ
+      setTimeout(() => {
+        if (msg.filePath && msg.lineNumber != null) {
+          labelInput?.focus();
+        } else if (msg.filePath) {
+          lineInput.focus();
+        } else {
+          fileInput.focus();
+        }
+      }, 50);
+    }
   } else if (msg.command === 'setHighlightedBookmark') {
     // ブックマークをハイライト
     console.log('[Core Anchor] Set highlighted bookmark:', { 

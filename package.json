@@ -2,7 +2,7 @@
   "name": "core-anchor",
   "displayName": "Core Anchor",
   "description": "Manage favorite files and bookmarks with a beautiful, customizable interface",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "uta-orange-1214",
   "author": {
     "name": "uta"
@@ -240,6 +240,26 @@
             "All files expanded by default / デフォルトで全ファイルを展開"
           ],
           "description": "Default expand state for bookmark files when opening workspace / ワークスペースを開いたときのブックマークファイルの初期開閉状態"
+        },
+        "core-anchor.bookmarks.skipIconSelect": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip icon type selection when adding a bookmark via shortcut or context menu. The default icon will be used automatically. / ショートカット・右クリックでブックマーク追加する際にアイコン選択をスキップします。デフォルトアイコンが自動的に使用されます。"
+        },
+        "core-anchor.bookmarks.navigation.wrap": {
+          "type": "boolean",
+          "default": true,
+          "description": "Wrap around to the last/first bookmark when navigating past the end/beginning of the file. / ファイルの先頭・末尾を超えてナビゲートした際に最後・最初のブックマークに折り返します。"
+        },
+        "core-anchor.notifications.show": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show information notifications for bookmark and favorite operations (add, edit, delete, move, etc.). Error messages are always shown. / ブックマーク・お気に入りの操作（追加・編集・削除・移動など）の情報通知を表示します。エラーメッセージは常に表示されます。"
+        },
+        "core-anchor.favorites.skipDescriptionOnAdd": {
+          "type": "boolean",
+          "default": false,
+          "description": "Skip the description input dialog when adding a favorite via shortcut or context menu. The file will be added with an empty description. / ショートカット・右クリックでお気に入り追加する際に説明入力ダイアログをスキップします。説明は空で追加されます。"
         }
       }
     }

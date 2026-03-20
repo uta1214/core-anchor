@@ -22,6 +22,18 @@ function toggleBookmarkForm() {
   }
 }
 
+// 「+ Add Bookmark」ボタン用:
+// フォームが既に開いていればキャンセル、閉じていればバックエンドへ
+// アクティブエディタのファイルパス・カーソル行のプリフィルを依頼する
+function addBookmarkWithContext() {
+  const form = document.getElementById('bookmarkForm');
+  if (form && form.classList.contains('active')) {
+    cancelAddBookmark();
+  } else {
+    vscode.postMessage({ command: 'addBookmarkWithContext' });
+  }
+}
+
 function cancelAddBookmark() {
   document.getElementById('bookmarkForm').classList.remove('active');
   document.getElementById('bookmarkFile').value = '';

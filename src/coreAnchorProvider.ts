@@ -20,6 +20,15 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.decorationTypes = decorationTypes;
   }
 
+  // ③ notifications.show 設定に従って情報通知を表示するヘルパー
+  // エラーメッセージ (showErrorMessage) は設定に関わらず常に表示する
+  private showInfo(message: string): void {
+    const config = vscode.workspace.getConfiguration('core-anchor');
+    if (config.get<boolean>('notifications.show', true)) {
+      this.showInfo(message);
+    }
+  }
+
   reloadWebview() {
     if (this._view) {
       try {
@@ -125,6 +134,9 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           break;
         case 'openFile':
           await this.openFile(message.path, message.openToSide);
+          break;
+        case 'addBookmarkWithContext':
+          await this.addBookmarkWithContext();
           break;
         case 'addBookmarkManual':
           await this.addBookmarkManual(message.filePath, message.line, message.label, message.iconType);
@@ -566,7 +578,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     await this.context.workspaceState.update('favoriteMode', mode);
     this.sendFavoriteMode();
     this.refresh();
-    vscode.window.showInformationMessage(`Switched to ${mode} favorites`);
+    this.showInfo(`Switched to ${mode} favorites`);
   }
 
   // フォルダの深さをセット
@@ -606,7 +618,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     meta.folderOrder = folders;
     this.saveFavoritesMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage('Folders sorted');
+    this.showInfo('Folders sorted');
   }
 
   // Favoriteファイル（フォルダ内）をソート
@@ -635,7 +647,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     meta.fileOrder[folderPath] = filesInFolder.map(f => f.filePath);
     this.saveFavoritesMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage('Files sorted');
+    this.showInfo('Files sorted');
   }
 
   // Bookmarkファイルをソート
@@ -655,7 +667,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     meta.fileOrder = files;
     this.saveBookmarksMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage('Bookmark files sorted');
+    this.showInfo('Bookmark files sorted');
   }
 
   // Bookmarks（ファイル内）をソート
@@ -739,7 +751,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.saveFavorites(favorites);
 
     this.refresh();
-    vscode.window.showInformationMessage(`Added "${filePath}" to favorites`);
+    this.showInfo(`Added "${filePath}" to favorites`);
   }
 
   // Quick Add: 現在のファイルをフォルダ選択して追加
@@ -761,7 +773,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     // 既に登録されているか確認
     const favorites = this.loadFavorites();
     if (favorites[relativePath]) {
-      vscode.window.showInformationMessage(`"${relativePath}" is already in favorites`);
+      this.showInfo(`"${relativePath}" is already in favorites`);
       return;
     }
 
@@ -902,7 +914,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.saveFavorites(favorites);
 
     this.refresh();
-    vscode.window.showInformationMessage(`Updated "${newPath}"`);
+    this.showInfo(`Updated "${newPath}"`);
   }
 
   private async removeFavorite(filePath: string) {
@@ -971,11 +983,11 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     this.refresh();
     
     if (pathParts.length > 1) {
-      vscode.window.showInformationMessage(`Created folder path: ${pathParts.join(' / ')}`);
+      this.showInfo(`Created folder path: ${pathParts.join(' / ')}`);
     } else {
       const parentFolder = parentId ? meta.virtualFolders.find(f => f.id === parentId) : null;
       const location = parentFolder ? `in "${parentFolder.name}"` : 'at root';
-      vscode.window.showInformationMessage(`Created virtual folder "${pathParts[0]}" ${location}`);
+      this.showInfo(`Created virtual folder "${pathParts[0]}" ${location}`);
     }
   }
 
@@ -1000,7 +1012,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     folder.name = newName.trim();
     this.saveFavoritesMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage(`Renamed to "${newName}"`);
+    this.showInfo(`Renamed to "${newName}"`);
   }
 
   // 仮想フォルダを削除
@@ -1051,7 +1063,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.saveFavorites(favorites);
     }
     this.refresh();
-    vscode.window.showInformationMessage(`Deleted virtual folder "${folderName}" and moved all files to Uncategorized`);
+    this.showInfo(`Deleted virtual folder "${folderName}" and moved all files to Uncategorized`);
   }
 
   // 仮想フォルダの色を変更
@@ -1070,7 +1082,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     folder.color = color;
     this.saveFavoritesMeta(meta);
     this.refresh();
-    vscode.window.showInformationMessage(`Changed color to ${color === 'currentColor' ? 'Default' : color}`);
+    this.showInfo(`Changed color to ${color === 'currentColor' ? 'Default' : color}`);
   }
 
   // UI付きで色変更
@@ -1177,7 +1189,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     }
     
     const fileName = path.basename(filePath);
-    vscode.window.showInformationMessage(`Moved "${fileName}" to "${targetFolderName}"`);
+    this.showInfo(`Moved "${fileName}" to "${targetFolderName}"`);
   }
 
   // 仮想フォルダを別の仮想フォルダに移動（サブフォルダ化）
@@ -1220,7 +1232,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       }
     }
     
-    vscode.window.showInformationMessage(`Moved folder "${folder.name}" to "${targetFolderName}"`);
+    this.showInfo(`Moved folder "${folder.name}" to "${targetFolderName}"`);
   }
 
   // ファイル並び替え（同一フォルダ内）
@@ -1426,22 +1438,31 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
     const line = editor.selection.active.line;
 
-    const iconTypeItems = Object.entries(ICON_TYPE_LABELS)
-      .filter(([value]) => value !== 'all') // 'all'アイコンは除外
-      .map(([value, label]) => {
-        const iconPath = this.getIconPath(value as BookmarkIconType);
-        return {
-          label,
-          value: value as BookmarkIconType,
-          iconPath: vscode.Uri.file(iconPath)
-        };
+    // ① skipIconSelect: true の場合はアイコン選択をスキップしてデフォルトを使用
+    const config = vscode.workspace.getConfiguration('core-anchor');
+    const skipIconSelect = config.get<boolean>('bookmarks.skipIconSelect', false);
+
+    let chosenIconType: BookmarkIconType = 'default';
+
+    if (!skipIconSelect) {
+      const iconTypeItems = Object.entries(ICON_TYPE_LABELS)
+        .filter(([value]) => value !== 'all') // 'all'アイコンは除外
+        .map(([value, label]) => {
+          const iconPath = this.getIconPath(value as BookmarkIconType);
+          return {
+            label,
+            value: value as BookmarkIconType,
+            iconPath: vscode.Uri.file(iconPath)
+          };
+        });
+
+      const selectedIconType = await vscode.window.showQuickPick(iconTypeItems, {
+        placeHolder: 'Select bookmark icon type',
       });
 
-    const selectedIconType = await vscode.window.showQuickPick(iconTypeItems, {
-      placeHolder: 'Select bookmark icon type',
-    });
-
-    if (!selectedIconType) return;
+      if (!selectedIconType) return;
+      chosenIconType = selectedIconType.value;
+    }
 
     const label = await vscode.window.showInputBox({
       prompt: 'Enter bookmark label',
@@ -1476,7 +1497,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     bookmarks[relativePath].push({ 
       line, 
       label,
-      iconType: selectedIconType.value,
+      iconType: chosenIconType,
       order: maxOrder + 1
     });
 
@@ -1495,11 +1516,40 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.updateDecorations(editor);
     }
     
-    vscode.window.showInformationMessage(`Bookmark added at line ${line + 1}`);
+    this.showInfo(`Bookmark added at line ${line + 1}`);
   }
 
   async addBookmarkFromCommand() {
     await this.addBookmark();
+  }
+
+  // サイドバーの「+ Add Bookmark」ボタン用:
+  // 現在アクティブなエディタのファイルパスとカーソル行をプリフィルしてフォームを開く
+  private async addBookmarkWithContext() {
+    if (!this._view) return;
+
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+      if (workspaceFolder) {
+        const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+        // カーソル行を 1-indexed で送る（フォームの表示は 1-indexed）
+        const lineNumber = editor.selection.active.line + 1;
+        this._view.webview.postMessage({
+          command: 'openAddBookmarkForm',
+          filePath: relativePath,
+          lineNumber: lineNumber
+        });
+        return;
+      }
+    }
+
+    // エディタが開いていない / ワークスペース外の場合は空フォームを開く
+    this._view.webview.postMessage({
+      command: 'openAddBookmarkForm',
+      filePath: '',
+      lineNumber: null
+    });
   }
 
   private async addFavoriteFromEditor() {
@@ -1594,12 +1644,21 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       virtualFolderId = folder ? folder.id : null;
     }
 
-    const description = await vscode.window.showInputBox({
-      prompt: 'Enter file description (optional)',
-      placeHolder: 'e.g. Entry point',
-    });
+    // ④ skipDescriptionOnAdd: true の場合は説明入力をスキップして空文字で追加
+    const config = vscode.workspace.getConfiguration('core-anchor');
+    const skipDescription = config.get<boolean>('favorites.skipDescriptionOnAdd', false);
 
-    if (description === undefined) return;
+    let description = '';
+    if (!skipDescription) {
+      const input = await vscode.window.showInputBox({
+        prompt: 'Enter file description (optional)',
+        placeHolder: 'e.g. Entry point',
+      });
+
+      // undefined はキャンセル操作なので追加しない
+      if (input === undefined) return;
+      description = input;
+    }
 
     await this.addFavorite(relativePath, description, true, virtualFolderId);
   }
@@ -1622,7 +1681,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const bookmarks = this.loadBookmarks();
     
     if (!bookmarks[relativePath]) {
-      vscode.window.showInformationMessage('No bookmarks in this file');
+      this.showInfo('No bookmarks in this file');
       return;
     }
 
@@ -1630,21 +1689,21 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const bookmarkIndex = bookmarks[relativePath].findIndex(b => b.line === currentLine);
     
     if (bookmarkIndex === -1) {
-      vscode.window.showInformationMessage('No bookmark on current line');
+      this.showInfo('No bookmark on current line');
       return;
     }
 
     // 1行上に移動できるか確認
     const newLine = currentLine - 1;
     if (newLine < 0) {
-      vscode.window.showInformationMessage('Already at the top');
+      this.showInfo('Already at the top');
       return;
     }
 
     // 移動先に既にブックマークがあるか確認
     const existingIndex = bookmarks[relativePath].findIndex(b => b.line === newLine);
     if (existingIndex !== -1) {
-      vscode.window.showInformationMessage('Bookmark already exists on target line');
+      this.showInfo('Bookmark already exists on target line');
       return;
     }
 
@@ -1658,7 +1717,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.updateDecorations(editor);
     }
     
-    vscode.window.showInformationMessage(`Bookmark moved to line ${newLine + 1}`);
+    this.showInfo(`Bookmark moved to line ${newLine + 1}`);
   }
 
   // ブックマークを下に移動
@@ -1675,7 +1734,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const bookmarks = this.loadBookmarks();
     
     if (!bookmarks[relativePath]) {
-      vscode.window.showInformationMessage('No bookmarks in this file');
+      this.showInfo('No bookmarks in this file');
       return;
     }
 
@@ -1683,21 +1742,21 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const bookmarkIndex = bookmarks[relativePath].findIndex(b => b.line === currentLine);
     
     if (bookmarkIndex === -1) {
-      vscode.window.showInformationMessage('No bookmark on current line');
+      this.showInfo('No bookmark on current line');
       return;
     }
 
     // 1行下に移動できるか確認
     const newLine = currentLine + 1;
     if (newLine >= editor.document.lineCount) {
-      vscode.window.showInformationMessage('Already at the bottom');
+      this.showInfo('Already at the bottom');
       return;
     }
 
     // 移動先に既にブックマークがあるか確認
     const existingIndex = bookmarks[relativePath].findIndex(b => b.line === newLine);
     if (existingIndex !== -1) {
-      vscode.window.showInformationMessage('Bookmark already exists on target line');
+      this.showInfo('Bookmark already exists on target line');
       return;
     }
 
@@ -1711,7 +1770,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.updateDecorations(editor);
     }
     
-    vscode.window.showInformationMessage(`Bookmark moved to line ${newLine + 1}`);
+    this.showInfo(`Bookmark moved to line ${newLine + 1}`);
   }
 
   private async addBookmarkManual(filePath: string, lineStr: string, label: string, iconType?: string) {
@@ -1772,7 +1831,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.updateDecorations(editor);
     }
     
-    vscode.window.showInformationMessage(`Bookmark added: ${filePath}:${line + 1}`);
+    this.showInfo(`Bookmark added: ${filePath}:${line + 1}`);
   }
 
   private async editBookmark(filePath: string, oldLine: number, newLineStr: string, label: string, iconType?: string) {
@@ -1810,7 +1869,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.updateDecorations(editor);
     }
     
-    vscode.window.showInformationMessage(`Bookmark updated`);
+    this.showInfo(`Bookmark updated`);
   }
 
   private async removeBookmark(filePath: string, line: number) {
@@ -1856,7 +1915,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
         this.updateDecorations(editor);
       }
       
-      vscode.window.showInformationMessage(`Deleted ${count} bookmarks from ${filePath}`);
+      this.showInfo(`Deleted ${count} bookmarks from ${filePath}`);
     }
   }
 
@@ -1878,7 +1937,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       this.saveFavorites(favorites);
       this.refresh();
       
-      vscode.window.showInformationMessage(`Deleted ${filesToDelete.length} files from favorites`);
+      this.showInfo(`Deleted ${filesToDelete.length} files from favorites`);
     }
   }
 
