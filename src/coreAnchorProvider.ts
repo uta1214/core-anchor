@@ -25,7 +25,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
   private showInfo(message: string): void {
     const config = vscode.workspace.getConfiguration('core-anchor');
     if (config.get<boolean>('notifications.show', true)) {
-      this.showInfo(message);
+      vscode.window.showInformationMessage(message);
     }
   }
 
@@ -202,6 +202,33 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           });
           this.refresh();
           break;
+      }
+    });
+
+    // パネルが再び表示されたタイミングで必ず再描画する。
+    // SSH 接続環境では別パネルへの切り替えや接続の揺れにより
+    // resolveWebviewView が再呼び出しされないまま webview が空になる場合があるため、
+    // visible になるたびに refresh() を呼ぶことで確実にデータを復元する。
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) {
+        this.sendIconPaths(webviewView);
+        this.sendFavoriteMode();
+        // folderDepth は workspaceState で管理されているため、
+        // webview が再表示されたタイミングで必ず再送する。
+        const folderDepth = this.context.workspaceState.get('folderDepth', 1);
+        webviewView.webview.postMessage({
+          command: 'setFolderDepth',
+          depth: folderDepth
+        });
+        const config = vscode.workspace.getConfiguration('core-anchor');
+        const showFavorites = config.get<boolean>('ui.showFavorites', true);
+        const showBookmarks = config.get<boolean>('ui.showBookmarks', true);
+        webviewView.webview.postMessage({
+          command: 'setSectionVisibility',
+          showFavorites: showFavorites,
+          showBookmarks: showBookmarks
+        });
+        this.refresh();
       }
     });
     
@@ -404,7 +431,13 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       fs.mkdirSync(configDir, { recursive: true });
     }
     
-    return path.join(configDir, 'code-anchor-favorites.json');
+    const newPath = path.join(configDir, 'core-anchor-favorites.json');
+    const oldPath = path.join(configDir, 'code-anchor-favorites.json');
+    // 旧ファイルが存在し新ファイルがまだない場合のみ移行（データ保持）
+    if (!fs.existsSync(newPath) && fs.existsSync(oldPath)) {
+      fs.renameSync(oldPath, newPath);
+    }
+    return newPath;
   }
 
   // Local Favoritesのパスを取得
@@ -428,7 +461,13 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
       }
-      return path.join(configDir, 'code-anchor-favorites-meta.json');
+      const newMetaPath = path.join(configDir, 'core-anchor-favorites-meta.json');
+      const oldMetaPath = path.join(configDir, 'code-anchor-favorites-meta.json');
+      // 旧ファイルが存在し新ファイルがまだない場合のみ移行（データ保持）
+      if (!fs.existsSync(newMetaPath) && fs.existsSync(oldMetaPath)) {
+        fs.renameSync(oldMetaPath, newMetaPath);
+      }
+      return newMetaPath;
     } else {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) return '';
@@ -762,18 +801,24 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-    if (!workspaceFolder) {
+    // ワークスペース自体が開いているか確認（ファイルがワークスペース外でもOK）
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
       vscode.window.showErrorMessage('No workspace folder is open');
       return;
     }
 
-    const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+    // ファイルがワークスペース内なら相対パス、外なら絶対パスを使用
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+    const filePath = workspaceFolder
+      ? vscode.workspace.asRelativePath(editor.document.uri)
+      : editor.document.uri.fsPath;
+    const isRelative = !!workspaceFolder;
 
     // 既に登録されているか確認
     const favorites = this.loadFavorites();
-    if (favorites[relativePath]) {
-      this.showInfo(`"${relativePath}" is already in favorites`);
+    if (favorites[filePath]) {
+      this.showInfo(`"${filePath}" is already in favorites`);
       return;
     }
 
@@ -854,7 +899,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       virtualFolderId = folder ? folder.id : null;
     }
 
-    await this.addFavorite(relativePath, '', true, virtualFolderId);
+    await this.addFavorite(filePath, '', isRelative, virtualFolderId);
   }
 
   // Add File with Context: 現在のファイルをプリフィルしてフォームを開く
@@ -1356,24 +1401,34 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
   }
 
 
-  // フォルダAがフォルダBの子孫かどうかチェック
-  private isDescendant(folders: VirtualFolder[], checkId: string, ancestorId: string): boolean {
+  // フォルダAがフォルダBの子孫かどうかチェック（循環参照ガード付き）
+  private isDescendant(folders: VirtualFolder[], checkId: string, ancestorId: string, visited = new Set<string>()): boolean {
+    if (visited.has(checkId)) return false; // 循環参照を検出したら false
+    visited.add(checkId);
     const folder = folders.find(f => f.id === checkId);
     if (!folder) return false;
     if (!folder.parentId) return false;
     if (folder.parentId === ancestorId) return true;
-    return this.isDescendant(folders, folder.parentId, ancestorId);
+    return this.isDescendant(folders, folder.parentId, ancestorId, visited);
   }
 
   private async openFile(filePath: string, openToSide: boolean = false) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
-    if (!workspaceFolders) {
-      vscode.window.showErrorMessage('No workspace folder is open');
-      return;
-    }
 
-    const fullPath = path.join(workspaceFolders[0].uri.fsPath, filePath);
-    const uri = vscode.Uri.file(fullPath);
+    let uri: vscode.Uri;
+
+    // 絶対パス（ワークスペース外ファイル）はそのまま URI に変換
+    // 相対パスはワークスペースルートと結合
+    if (path.isAbsolute(filePath)) {
+      uri = vscode.Uri.file(filePath);
+    } else {
+      if (!workspaceFolders) {
+        vscode.window.showErrorMessage('No workspace folder is open');
+        return;
+      }
+      const fullPath = path.join(workspaceFolders[0].uri.fsPath, filePath);
+      uri = vscode.Uri.file(fullPath);
+    }
 
     try {
       const document = await vscode.workspace.openTextDocument(uri);
@@ -1429,13 +1484,19 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-    if (!workspaceFolder) {
+    // ブックマークは .vscode/bookmarks.json に保存するためワークスペース自体は必要
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
       vscode.window.showErrorMessage('No workspace folder is open');
       return;
     }
 
-    const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+    // ワークスペース内なら相対パス、外なら絶対パスを使用（favorites と同様）
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+    const filePath = workspaceFolder
+      ? vscode.workspace.asRelativePath(editor.document.uri)
+      : editor.document.uri.fsPath;
+
     const line = editor.selection.active.line;
 
     // ① skipIconSelect: true の場合はアイコン選択をスキップしてデフォルトを使用
@@ -1479,22 +1540,22 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       bookmarks = JSON.parse(content);
     }
 
-    if (!bookmarks[relativePath]) {
-      bookmarks[relativePath] = [];
+    if (!bookmarks[filePath]) {
+      bookmarks[filePath] = [];
     }
 
     // orderを初期化
     let maxOrder = 0;
-    bookmarks[relativePath].forEach(b => {
+    bookmarks[filePath].forEach(b => {
       if (b.order !== undefined && b.order > maxOrder) {
         maxOrder = b.order;
       }
     });
 
     // 同じ行に既存のブックマークがあれば削除（上書き）
-    bookmarks[relativePath] = bookmarks[relativePath].filter(b => b.line !== line);
+    bookmarks[filePath] = bookmarks[filePath].filter(b => b.line !== line);
 
-    bookmarks[relativePath].push({ 
+    bookmarks[filePath].push({ 
       line, 
       label,
       iconType: chosenIconType,
@@ -1505,7 +1566,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     const meta = this.loadBookmarksMeta();
     const sortType = meta.globalSortType || 'line';
     if (sortType === 'line') {
-      bookmarks[relativePath].sort((a, b) => a.line - b.line);
+      bookmarks[filePath].sort((a, b) => a.line - b.line);
     }
     // 'order' の場合はpushしたまま（末尾=追加順）でOK
     
@@ -1530,21 +1591,22 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
 
     const editor = vscode.window.activeTextEditor;
     if (editor) {
+      // ワークスペース内なら相対パス、外なら絶対パスをプリフィル（favorites と同様）
       const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-      if (workspaceFolder) {
-        const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
-        // カーソル行を 1-indexed で送る（フォームの表示は 1-indexed）
-        const lineNumber = editor.selection.active.line + 1;
-        this._view.webview.postMessage({
-          command: 'openAddBookmarkForm',
-          filePath: relativePath,
-          lineNumber: lineNumber
-        });
-        return;
-      }
+      const filePath = workspaceFolder
+        ? vscode.workspace.asRelativePath(editor.document.uri)
+        : editor.document.uri.fsPath;
+      // カーソル行を 1-indexed で送る（フォームの表示は 1-indexed）
+      const lineNumber = editor.selection.active.line + 1;
+      this._view.webview.postMessage({
+        command: 'openAddBookmarkForm',
+        filePath: filePath,
+        lineNumber: lineNumber
+      });
+      return;
     }
 
-    // エディタが開いていない / ワークスペース外の場合は空フォームを開く
+    // エディタが開いていない場合は空フォームを開く
     this._view.webview.postMessage({
       command: 'openAddBookmarkForm',
       filePath: '',
@@ -1559,13 +1621,18 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-    if (!workspaceFolder) {
+    // ワークスペース自体が開いているか確認（ファイルがワークスペース外でもOK）
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
       vscode.window.showErrorMessage('No workspace folder is open');
       return;
     }
 
-    const relativePath = vscode.workspace.asRelativePath(editor.document.uri);
+    // ファイルがワークスペース内なら相対パス、外なら絶対パスを使用
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+    const filePath = workspaceFolder
+      ? vscode.workspace.asRelativePath(editor.document.uri)
+      : editor.document.uri.fsPath;
 
     // フォルダ選択QuickPick
     const meta = this.loadFavoritesMeta();
@@ -1660,7 +1727,7 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       description = input;
     }
 
-    await this.addFavorite(relativePath, description, true, virtualFolderId);
+    await this.addFavorite(filePath, description, !!workspaceFolder, virtualFolderId);
   }
 
   async addFavoriteFromCommand() {
@@ -1990,7 +2057,15 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
     if (!fs.existsSync(bookmarksPath)) return {};
 
     const content = fs.readFileSync(bookmarksPath, 'utf-8');
-    return JSON.parse(content);
+    const raw: BookmarksData = JSON.parse(content);
+
+    // Windows 環境で保存されたデータにバックスラッシュが混入している場合に備え、
+    // すべてのキーをスラッシュ区切りに正規化する。
+    const normalized: BookmarksData = {};
+    for (const [key, value] of Object.entries(raw)) {
+      normalized[key.replace(/\\/g, '/')] = value;
+    }
+    return normalized;
   }
 
   private getHtmlContent(): string {
@@ -2070,7 +2145,6 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
           : `**${ICON_TYPE_LABELS[iconType]}** (Line ${bookmark.line + 1})`;
         
         const hoverMsg = new vscode.MarkdownString(hoverText);
-        hoverMsg.isTrusted = true;
         
         if (!decorationsByType.has(iconType)) {
           decorationsByType.set(iconType, []);
@@ -2120,7 +2194,10 @@ export class CoreAnchorProvider implements vscode.WebviewViewProvider {
       
       if (workspaceFolders) {
         Object.entries(bookmarks).forEach(([filePath, marks]) => {
-          const fullPath = path.join(workspaceFolders[0].uri.fsPath, filePath);
+          // 絶対パス（ワークスペース外ファイル）はそのまま使用
+          const fullPath = path.isAbsolute(filePath)
+            ? filePath
+            : path.join(workspaceFolders[0].uri.fsPath, filePath);
           bookmarksWithContent[filePath] = [];
           
           marks.forEach(mark => {

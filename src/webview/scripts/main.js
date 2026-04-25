@@ -233,6 +233,8 @@ function handleEscapeKey(e) {
   }
 }
 
+// ページ読み込み完了後にバックエンドへ準備完了を通知する。
+// 'load' イベントのみ使用し、'DOMContentLoaded' との二重送信を防ぐ。
 window.addEventListener('load', () => { 
   loadState(); 
   vscode.postMessage({ command: 'ready' }); 
@@ -414,12 +416,6 @@ window.addEventListener('message', event => {
       }
     }
   }
-});
-
-// ページ読み込み時の初期化
-window.addEventListener('DOMContentLoaded', () => {
-  loadState();
-  vscode.postMessage({ command: 'ready' });
 });
 
 // グローバルに公開

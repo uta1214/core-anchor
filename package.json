@@ -2,7 +2,7 @@
   "name": "core-anchor",
   "displayName": "Core Anchor",
   "description": "Manage favorite files and bookmarks with a beautiful, customizable interface",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "publisher": "uta-orange-1214",
   "author": {
     "name": "uta"

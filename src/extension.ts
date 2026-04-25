@@ -11,7 +11,7 @@ const decorationTypes: Map<BookmarkIconType, vscode.TextEditorDecorationType> = 
 function showInfo(message: string): void {
   const config = vscode.workspace.getConfiguration('core-anchor');
   if (config.get<boolean>('notifications.show', true)) {
-    showInfo(message);
+    vscode.window.showInformationMessage(message);
   }
 }
 
@@ -97,7 +97,15 @@ function loadBookmarks(): BookmarksData {
   
   try {
     const content = fs.readFileSync(bookmarksPath, 'utf-8');
-    return JSON.parse(content);
+    const raw: BookmarksData = JSON.parse(content);
+
+    // Windows 環境で保存されたデータにバックスラッシュが混入している場合に備え、
+    // すべてのキーをスラッシュ区切りに正規化する。
+    const normalized: BookmarksData = {};
+    for (const [key, value] of Object.entries(raw)) {
+      normalized[key.replace(/\\/g, '/')] = value;
+    }
+    return normalized;
   } catch (error) {
     console.error('Error loading bookmarks:', error);
     return {};

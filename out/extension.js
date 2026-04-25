@@ -45,7 +45,7 @@ const decorationTypes = new Map();
 function showInfo(message) {
     const config = vscode.workspace.getConfiguration('core-anchor');
     if (config.get('notifications.show', true)) {
-        showInfo(message);
+        vscode.window.showInformationMessage(message);
     }
 }
 // カスタムアイコンパスを取得する関数
@@ -106,7 +106,14 @@ function loadBookmarks() {
         return {};
     try {
         const content = fs.readFileSync(bookmarksPath, 'utf-8');
-        return JSON.parse(content);
+        const raw = JSON.parse(content);
+        // Windows 環境で保存されたデータにバックスラッシュが混入している場合に備え、
+        // すべてのキーをスラッシュ区切りに正規化する。
+        const normalized = {};
+        for (const [key, value] of Object.entries(raw)) {
+            normalized[key.replace(/\\/g, '/')] = value;
+        }
+        return normalized;
     }
     catch (error) {
         console.error('Error loading bookmarks:', error);

@@ -428,6 +428,7 @@ body {
   display: flex; 
   align-items: center; 
   padding: 8px 10px;
+  min-height: 40px;
   cursor: pointer; 
   user-select: none; 
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.05) 0%, rgba(192, 108, 255, 0.05) 100%);
@@ -440,7 +441,6 @@ body {
 .folder-header:hover { 
   background: linear-gradient(135deg, rgba(255, 107, 157, 0.1) 0%, rgba(192, 108, 255, 0.1) 100%);
   border-color: rgba(255, 107, 157, 0.3);
-  transform: translateY(-2px) scale(1.01);
   box-shadow: 0 6px 16px rgba(255, 107, 157, 0.15);
 }
 
@@ -521,6 +521,7 @@ body {
   width: 12px;
   font-size: 9px;
   transition: transform 0.2s;
+  flex-shrink: 0;
   display: inline-block;
   color: #c06cff;
   flex-shrink: 0;
@@ -812,16 +813,20 @@ body {
     font-size: 9px;
   }
   
-  .folder-count, .file-count {
-    display: none;
-  }
+  /* .folder-count, .file-count: kept visible at all widths */
   
   .item-desc {
-    display: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-wrap: normal;
+    overflow-wrap: normal;
   }
   
   .debug-info {
-    display: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .folder-name, .file-name {
@@ -914,15 +919,14 @@ body {
 }
 
 .folder-buttons {
-  opacity: 0;
-  transition: opacity 0.2s ease-in-out;
-  display: flex;
+  display: none;
   gap: 4px;
   flex-shrink: 0;
+  align-items: center;
 }
 
 .folder-header:hover .folder-buttons {
-  opacity: 1;
+  display: flex;
 }
 
 .item-buttons .btn:hover,

@@ -9,6 +9,41 @@ let highlightedBookmark = null; // { filePath, line } - ハイライト中のブ
 let bookmarksDefaultExpandState = 'collapsed'; // 初期開閉状態
 let globalBookmarkSortType = 'line'; // グローバルソートタイプ
 
+// ブックマークのファイルヘッダー用表示名
+// 同じファイル名が他にも存在する場合は「親ディレクトリ/ファイル名」で表示
+// favorites.js の getDisplayFileName と同等のロジック
+function getBookmarkDisplayName(filePath) {
+  if (!allBookmarksData) {
+    const parts = filePath.split('/');
+    return parts[parts.length - 1] || filePath;
+  }
+
+  const allPaths = Object.keys(allBookmarksData);
+  const parts = filePath.split('/');
+  const fileName = parts[parts.length - 1] || filePath;
+
+  const duplicates = allPaths.filter(p => (p.split('/').pop() || p) === fileName && p !== filePath);
+
+  // 重複なし: ファイル名のみ
+  if (duplicates.length === 0) return fileName;
+
+  // ワークスペース直下（パス区切りなし）: favorites と同様に (root)/ を付ける
+  if (parts.length === 1) return '(root)/' + fileName;
+
+  // 重複あり: 一意になる最小の親ディレクトリを探す（favorites の buildDisplayNameMap と同ロジック）
+  for (let depth = 1; depth < parts.length; depth++) {
+    const candidate = parts.slice(parts.length - 1 - depth).join('/');
+    const isUnique = duplicates.every(p => {
+      const pp = p.split('/');
+      if (pp.length === 1) return true;
+      return pp.slice(Math.max(0, pp.length - 1 - depth)).join('/') !== candidate;
+    });
+    if (isUnique) return candidate;
+  }
+
+  return filePath;
+}
+
 function toggleBookmarkForm() {
   const form = document.getElementById('bookmarkForm');
   form.classList.toggle('active');
@@ -258,7 +293,10 @@ function updateBookmarks(bookmarks) {
     } else {
       fileNameSpan.appendChild(document.createTextNode('📄 '));
     }
-    fileNameSpan.appendChild(document.createTextNode(filePath));
+    // 同名ファイルがある場合は親ディレクトリ名も表示、フルパスはtitleで確認
+    const displayName = getBookmarkDisplayName(filePath);
+    fileNameSpan.title = filePath;
+    fileNameSpan.appendChild(document.createTextNode(displayName));
 
     // バッジ（件数）
     const countSpan = document.createElement('span');
@@ -388,6 +426,95 @@ function updateBookmarks(bookmarks) {
     
     fileDiv.appendChild(headerDiv);
     fileDiv.appendChild(itemsDiv);
+    // ファイルグループにドラッグ＆ドロップ並び替えを付与
+    attachBmDragEvents(fileDiv, filePath);
     container.appendChild(fileDiv);
+  });
+}
+// ─── ブックマークファイル並び替え (ドラッグ＆ドロップ) ─────────────────────
+
+let bmDraggedFilePath = null;
+let bmDragPlaceholder = null;
+
+function bmGetCurrentFileOrder() {
+  const container = document.getElementById('bookmarks');
+  return Array.from(container.querySelectorAll('.file-group[data-bm-filepath]'))
+    .map(el => el.getAttribute('data-bm-filepath'));
+}
+
+function bmRemovePlaceholder() {
+  if (bmDragPlaceholder && bmDragPlaceholder.parentNode) {
+    bmDragPlaceholder.parentNode.removeChild(bmDragPlaceholder);
+  }
+  bmDragPlaceholder = null;
+}
+
+function bmShowPlaceholder(position, targetEl) {
+  bmRemovePlaceholder();
+  bmDragPlaceholder = document.createElement('div');
+  bmDragPlaceholder.style.cssText =
+    'height: 2px; background: var(--vscode-focusBorder); border-radius: 1px; margin: 2px 0;';
+  if (position === 'before') {
+    targetEl.parentNode.insertBefore(bmDragPlaceholder, targetEl);
+  } else {
+    targetEl.parentNode.insertBefore(bmDragPlaceholder, targetEl.nextSibling);
+  }
+}
+
+function attachBmDragEvents(fileDiv, filePath) {
+  fileDiv.setAttribute('data-bm-filepath', filePath);
+  fileDiv.draggable = true;
+
+  fileDiv.addEventListener('dragstart', (e) => {
+    bmDraggedFilePath = filePath;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => fileDiv.style.opacity = '0.4', 0);
+  });
+
+  fileDiv.addEventListener('dragend', () => {
+    fileDiv.style.opacity = '';
+    bmRemovePlaceholder();
+    bmDraggedFilePath = null;
+    // ドロップ先が確定している場合は drop イベント側で送信済み
+  });
+
+  fileDiv.addEventListener('dragover', (e) => {
+    if (!bmDraggedFilePath || bmDraggedFilePath === filePath) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const rect = fileDiv.getBoundingClientRect();
+    const pos = (e.clientY - rect.top) < rect.height / 2 ? 'before' : 'after';
+    bmShowPlaceholder(pos, fileDiv);
+  });
+
+  fileDiv.addEventListener('dragleave', (e) => {
+    // 子要素への移動は無視
+    if (fileDiv.contains(e.relatedTarget)) return;
+    bmRemovePlaceholder();
+  });
+
+  fileDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!bmDraggedFilePath || bmDraggedFilePath === filePath) {
+      bmRemovePlaceholder();
+      return;
+    }
+
+    const rect = fileDiv.getBoundingClientRect();
+    const pos = (e.clientY - rect.top) < rect.height / 2 ? 'before' : 'after';
+
+    // 現在の DOM 順序から新しい並びを計算
+    const currentOrder = bmGetCurrentFileOrder();
+    const fromIdx = currentOrder.indexOf(bmDraggedFilePath);
+    const toIdx   = currentOrder.indexOf(filePath);
+    if (fromIdx === -1 || toIdx === -1) { bmRemovePlaceholder(); return; }
+
+    currentOrder.splice(fromIdx, 1);
+    const insertAt = currentOrder.indexOf(filePath);
+    currentOrder.splice(pos === 'before' ? insertAt : insertAt + 1, 0, bmDraggedFilePath);
+
+    bmRemovePlaceholder();
+    vscode.postMessage({ command: 'reorderBookmarkFiles', files: currentOrder });
   });
 }

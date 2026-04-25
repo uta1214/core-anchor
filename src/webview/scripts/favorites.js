@@ -59,38 +59,29 @@ const COLOR_PALETTE = [
   { name: 'White', value: '#ffffff' }
 ];
 
-/**
- * 同じファイル名が複数ある場合、親ディレクトリを含めた表示名を返す
- * @param {string} filePath - ファイルのパス
- * @param {Object} allFiles - すべてのファイルのパス（キーはパス）
- * @returns {string} 表示名
- */
-function getDisplayFileName(filePath, allFiles) {
-  const parts = filePath.split('/');
-  const fileName = parts[parts.length - 1];
-  
-  if (!fileName) return filePath;
-  
-  // 同じファイル名を持つパスを検索
-  const sameName = Object.keys(allFiles).filter(p => {
-    const pFileName = p.split('/').pop();
-    return pFileName === fileName && p !== filePath;
+function buildDisplayNameMap(allPaths) {
+  const map = {};
+  allPaths.forEach(filePath => {
+    const parts = filePath.split('/');
+    const fileName = parts[parts.length - 1] || filePath;
+    const duplicates = allPaths.filter(p => (p.split('/').pop() || p) === fileName && p !== filePath);
+    if (duplicates.length === 0) { map[filePath] = fileName; return; }
+    if (parts.length === 1) { map[filePath] = '(root)/' + fileName; return; }
+    for (let depth = 1; depth < parts.length; depth++) {
+      const candidate = parts.slice(parts.length - 1 - depth).join('/');
+      const isUnique = duplicates.every(p => {
+        const pp = p.split('/');
+        if (pp.length === 1) return true;
+        return pp.slice(Math.max(0, pp.length - 1 - depth)).join('/') !== candidate;
+      });
+      if (isUnique) { map[filePath] = candidate; return; }
+    }
+    map[filePath] = filePath;
   });
-  
-  // 同じ名前のファイルがない場合はファイル名だけを返す
-  if (sameName.length === 0) {
-    return fileName;
-  }
-  
-  // 同じ名前のファイルがある場合は親ディレクトリを含める
-  if (parts.length >= 2) {
-    const parentDir = parts[parts.length - 2];
-    return parentDir + '/' + fileName;
-  }
-  
-  // フォールバック
-  return fileName;
+  return map;
 }
+
+let favoriteDisplayNameMap = {};
 
 
 // Form management
@@ -292,6 +283,9 @@ function updateFavorites(favorites) {
     return;
   }
   
+  const allPaths = allFavoritesData ? Object.keys(allFavoritesData) : Object.keys(favorites);
+  favoriteDisplayNameMap = buildDisplayNameMap(allPaths);
+  
   const entries = Object.entries(favorites);
   
   const folderFiles = {};
@@ -332,7 +326,7 @@ function updateFavorites(favorites) {
   
   rootFolders.forEach(folder => {
     const files = folderFiles[folder.id] || {};
-    renderVirtualFolder(folder, files, container, 0, folderFiles);
+    renderVirtualFolder(folder, files, container, 0, folderFiles, new Set());
   });
   
   if (Object.keys(rootFiles).length > 0) {
@@ -344,7 +338,10 @@ function updateFavorites(favorites) {
   }
 }
 
-function renderVirtualFolder(folder, files, container, depth = 0, allFolderFiles = {}) {
+function renderVirtualFolder(folder, files, container, depth = 0, allFolderFiles = {}, visited = new Set()) {
+  // 循環参照ガード：同じフォルダIDを2度処理しない
+  if (visited.has(folder.id)) return;
+  visited.add(folder.id);
   const folderId = safeId('vf-' + folder.id);
   const isExpanded = expandedFolders.has(folderId);
   const fileCount = Object.keys(files).length;
@@ -425,7 +422,7 @@ function renderVirtualFolder(folder, files, container, depth = 0, allFolderFiles
   
   sortedChildFolders.forEach(childFolder => {
     const childFiles = allFolderFiles[childFolder.id] || {};
-    renderVirtualFolder(childFolder, childFiles, itemsDiv, depth + 1, allFolderFiles);
+    renderVirtualFolder(childFolder, childFiles, itemsDiv, depth + 1, allFolderFiles, visited);
   });
   
   // ファイルを fileOrder でソート
@@ -476,39 +473,37 @@ function renderFolderNormalMode(headerDiv, folder, folderId, totalCount, isExpan
   const nameSpan = document.createElement('span');
   nameSpan.className = 'folder-name';
   nameSpan.style.color = folderColor;
-  nameSpan.innerHTML = FOLDER_ICON + '<span style="margin-left: 4px;">' + escapeHtml(folder.name) + '</span>';
+  nameSpan.innerHTML =
+    '<span style="flex-shrink:0;display:inline-flex;align-items:center;">' + FOLDER_ICON + '</span>' +
+    '<span style="flex:1;min-width:0;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(folder.name) + '</span>';
   nameSpan.style.cursor = 'pointer';
   nameSpan.style.flex = '1';
-  
-  const countSpan = document.createElement('span');
-  countSpan.className = 'folder-count';
-  countSpan.textContent = totalCount;
-  
+
+  // CSS の display:none → display:flex (hover) で制御。inline style 不要
   const buttonsSpan = document.createElement('span');
   buttonsSpan.className = 'folder-buttons';
-  buttonsSpan.style.cssText = 'margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s;';
-  
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'folder-count';
+  countSpan.style.flexShrink = '0';
+  countSpan.textContent = totalCount;
+
   const addBtn = createButton(ADD_FOLDER_ICON, 'Add File to Folder', (e) => showAddFilePopup(e, folder.id));
   const editBtn = createButton(EDIT_ICON, 'Rename Folder', () => startFolderRename(folder.id));
   const colorBtn = createButton(COLOR_ICON, 'Change Color', (e) => showColorPicker(e, folder.id));
   const deleteBtn = createButton(DELETE_ICON, 'Delete Folder', () => deleteVirtualFolder(folder.id));
-  
+
   buttonsSpan.appendChild(addBtn);
   buttonsSpan.appendChild(editBtn);
   buttonsSpan.appendChild(colorBtn);
   buttonsSpan.appendChild(deleteBtn);
-  
+
+  // 順序: name(flex:1 省略可) → buttons(hover時flex) → count(右端固定)
+  // ホバー時にボタンが出るとその分 name が縮んで省略表示になる
   headerDiv.appendChild(iconSpan);
   headerDiv.appendChild(nameSpan);
-  headerDiv.appendChild(countSpan);
   headerDiv.appendChild(buttonsSpan);
-  
-  headerDiv.addEventListener('mouseenter', () => {
-    buttonsSpan.style.opacity = '1';
-  });
-  headerDiv.addEventListener('mouseleave', () => {
-    buttonsSpan.style.opacity = '0';
-  });
+  headerDiv.appendChild(countSpan);
   
   // draggable設定（シンプル版）
   headerDiv.draggable = true;
@@ -987,13 +982,16 @@ function renderRootFiles(files, container) {
   const nameSpan = document.createElement('span');
   nameSpan.className = 'folder-name';
   nameSpan.style.color = 'var(--vscode-descriptionForeground)';
-  nameSpan.innerHTML = FOLDER_ICON + '<span style="margin-left: 4px;">Uncategorized</span>';
+  nameSpan.innerHTML =
+    '<span style="flex-shrink:0;display:inline-flex;align-items:center;">' + FOLDER_ICON + '</span>' +
+    '<span style="flex:1;min-width:0;margin-left:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Uncategorized</span>';
   nameSpan.style.flex = '1';
-  
+
   const countSpan = document.createElement('span');
   countSpan.className = 'folder-count';
+  countSpan.style.flexShrink = '0';
   countSpan.textContent = Object.keys(files).length;
-  
+
   headerDiv.appendChild(iconSpan);
   headerDiv.appendChild(nameSpan);
   headerDiv.appendChild(countSpan);
@@ -1042,7 +1040,7 @@ function renderFavoriteFile(path, data, container, folderId) {
   itemDiv.addEventListener('dragleave', handleFileDragLeave);
   itemDiv.addEventListener('drop', (e) => handleFileDrop(e, path, folderId));
   
-  const fileName = getDisplayFileName(path, allFavoritesData); // 🔧 FIX: 同名ファイル対応
+  const fileName = favoriteDisplayNameMap[path] || path.split('/').pop() || path;
   const fileIconSrc = fileIcons[path] || '';
   const fileIconHtml = fileIconSrc 
     ? '<img src="' + fileIconSrc + '" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;" />' 
@@ -1175,6 +1173,11 @@ function clearPlaceholderStyle() {
     const header = el.querySelector('.folder-header') || el;
     header.style.borderTop = '';
     header.style.borderBottom = '';
+  });
+  // ファイルアイテムの並び替え用borderもクリア（通過した全.itemに青線が残るバグ対策）
+  document.querySelectorAll('.item').forEach(el => {
+    el.style.borderTop = '';
+    el.style.borderBottom = '';
   });
 }
 
